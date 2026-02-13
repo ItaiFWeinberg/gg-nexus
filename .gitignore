@@ -1,0 +1,19 @@
+﻿# Environment variables (NEVER commit API keys)
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Node
+node_modules/
+dist/
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.vscode/
+.idea/
