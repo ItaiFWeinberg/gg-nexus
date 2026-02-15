@@ -42,18 +42,19 @@ export async function updateProfile(profile) {
 // === CHAT ===
 const SESSION_KEY = 'gg_nexus_session_id';
 
-function getOrCreateSessionId() {
-  let id = sessionStorage.getItem(SESSION_KEY);
-  if (!id) {
-    id = 'session-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 7);
-    sessionStorage.setItem(SESSION_KEY, id);
-  }
-  return id;
-}
+let currentSessionId = sessionStorage.getItem(SESSION_KEY) ||
+  'session-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 7);
 
-let currentSessionId = getOrCreateSessionId();
+// Always persist
+sessionStorage.setItem(SESSION_KEY, currentSessionId);
 
 export function getSessionId() { return currentSessionId; }
+
+// THIS FIXES THE HISTORY BUG — lets Chat.jsx sync the session
+export function setSessionId(id) {
+  currentSessionId = id;
+  sessionStorage.setItem(SESSION_KEY, id);
+}
 
 export function newSession() {
   currentSessionId = 'session-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 7);

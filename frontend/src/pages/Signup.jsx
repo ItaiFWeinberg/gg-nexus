@@ -5,28 +5,16 @@ import { updateProfile } from '../services/api';
 import NoxusLogo from '../components/NoxusLogo';
 import BotAvatar from '../components/BotAvatar';
 import ParticleBackground from '../components/ParticleBackground';
-import { RiEyeLine, RiEyeOffLine } from 'react-icons/ri';
+import GameCard, { getGameData, getGameName } from '../components/GameCard';
+import { RiEyeLine, RiEyeOffLine, RiAddLine, RiCloseLine } from 'react-icons/ri';
 
-const GAMES_LIST = [
-  { id: 'lol', name: 'League of Legends', icon: '⚔️' },
-  { id: 'valorant', name: 'Valorant', icon: '🔫' },
-  { id: 'tft', name: 'TFT', icon: '♟️' },
-  { id: 'minecraft', name: 'Minecraft', icon: '⛏️' },
-  { id: 'cod', name: 'Call of Duty', icon: '🎯' },
-  { id: 'apex', name: 'Apex Legends', icon: '🏆' },
-  { id: 'cs2', name: 'CS2', icon: '💣' },
-  { id: 'fortnite', name: 'Fortnite', icon: '🏗️' },
-  { id: 'dota2', name: 'Dota 2', icon: '🗡️' },
-  { id: 'ow2', name: 'Overwatch 2', icon: '🛡️' },
-  { id: 'deadlock', name: 'Deadlock', icon: '🔒' },
-  { id: 'rl', name: 'Rocket League', icon: '🚗' },
-];
+const GAMES_LIST = getGameData();
 
 const PLAYSTYLES = [
-  { id: 'competitive', label: 'Competitive', desc: 'I play to win and climb', icon: '🏆' },
-  { id: 'casual', label: 'Casual', desc: 'I play to relax', icon: '🎮' },
-  { id: 'explorer', label: 'Explorer', desc: 'I love new games', icon: '🗺️' },
-  { id: 'social', label: 'Social', desc: 'I play with friends', icon: '👥' },
+  { id: 'competitive', label: 'Competitive', desc: 'I play to win and climb ranks', icon: '🏆' },
+  { id: 'casual', label: 'Casual', desc: 'I play to relax and have fun', icon: '🎮' },
+  { id: 'explorer', label: 'Explorer', desc: 'I love discovering new games', icon: '🗺️' },
+  { id: 'social', label: 'Social', desc: 'I mostly play with friends', icon: '👥' },
 ];
 
 const GOALS = [
@@ -47,12 +35,12 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedGames, setSelectedGames] = useState([]);
+  const [customGames, setCustomGames] = useState([]);
+  const [customGameInput, setCustomGameInput] = useState('');
   const [selectedPlaystyle, setSelectedPlaystyle] = useState('');
   const [selectedGoals, setSelectedGoals] = useState([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Store credentials for deferred signup
   const [savedCreds, setSavedCreds] = useState(null);
 
   const { signup } = useAuth();
@@ -61,14 +49,24 @@ export default function Signup() {
   const toggleGame = (id) => setSelectedGames(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
   const toggleGoal = (id) => setSelectedGoals(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
 
+  const addCustomGame = () => {
+    const game = customGameInput.trim();
+    if (game && !customGames.includes(game)) {
+      setCustomGames(prev => [...prev, game]);
+      setCustomGameInput('');
+    }
+  };
+
+  const removeCustomGame = (game) => setCustomGames(prev => prev.filter(g => g !== game));
+
+  const totalGames = selectedGames.length + customGames.length;
+
   const handleStep1 = () => {
     setError('');
     if (username.length < 3) return setError('Username must be at least 3 characters');
     if (!email.includes('@')) return setError('Please enter a valid email');
     if (password.length < 6) return setError('Password must be at least 6 characters');
     if (password !== confirmPassword) return setError('Passwords do not match');
-
-    // Save credentials but DON'T sign up yet — wait for onboarding
     setSavedCreds({ username, email, password });
     setStep(2);
   };
@@ -77,184 +75,231 @@ export default function Signup() {
     if (!savedCreds) return;
     setIsLoading(true);
     setError('');
-
     try {
-      // NOW create the account
       await signup(savedCreds.username, savedCreds.email, savedCreds.password);
-
-      // Save preferences to profile
-      const gameNames = GAMES_LIST.filter(g => selectedGames.includes(g.id)).map(g => g.name);
+      const knownGames = selectedGames.map(id => getGameName(id));
+      const allGames = [...knownGames, ...customGames];
       await updateProfile({
-        favorite_games: gameNames,
+        favorite_games: allGames,
         playstyle: [selectedPlaystyle],
         goals: selectedGoals,
         platforms: ['PC'],
       });
-
       navigate('/chat');
     } catch (err) {
-      setError(err.response?.data?.error || 'Signup failed. Please try again.');
-      setStep(1); // Go back to fix
+      setError(err.response?.data?.error || 'Signup failed.');
+      setStep(1);
     } finally {
       setIsLoading(false);
     }
   };
 
   const botMood = step === 1 ? 'idle' : step === 2 ? 'excited' : 'happy';
+  const botSpeech = step === 1 ? "Let's get you set up." : step === 2 ? "Pick everything you play!" : "Last step — how do you play?";
 
   return (
-    <div className="min-h-screen bg-nox-bg relative overflow-hidden flex items-center justify-center px-6">
+    <div className="min-h-screen bg-nox-bg relative overflow-hidden">
       <ParticleBackground />
 
-      <div className="relative z-10 w-full max-w-md">
-        <div className="flex justify-center mb-3">
-          <Link to="/landing"><NoxusLogo size={44} animated /></Link>
+      <div className="relative z-10 min-h-screen flex flex-col items-center px-4 py-6">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4">
+          <Link to="/landing"><NoxusLogo size={36} /></Link>
+          <BotAvatar mood={botMood} size={50} />
+          <div className="glass rounded-lg px-3 py-1.5">
+            <p className="text-[11px] text-nox-muted">{botSpeech}</p>
+          </div>
         </div>
 
-        <div className="flex justify-center mb-3">
-          <BotAvatar mood={botMood} size={70} />
-        </div>
-
-        {/* Step indicator */}
-        <div className="flex justify-center gap-2 mb-6">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className={`h-1 rounded-full transition-all duration-500 ${
-              s === step ? 'w-8 bg-nox-red' : s < step ? 'w-8 bg-nox-red/40' : 'w-8 bg-nox-border'
-            }`} />
+        {/* Steps */}
+        <div className="flex items-center gap-1 mb-6">
+          {[
+            { n: 1, label: 'Account' },
+            { n: 2, label: 'Games' },
+            { n: 3, label: 'Style' },
+          ].map((s, i) => (
+            <div key={s.n} className="flex items-center">
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
+                s.n === step ? 'bg-nox-red text-white' : s.n < step ? 'bg-nox-red/20 text-nox-red' : 'bg-nox-border/50 text-nox-subtle'
+              }`}>
+                <span className="font-bold">{s.n}</span>
+                <span className="hidden sm:inline">{s.label}</span>
+              </div>
+              {i < 2 && <div className={`w-6 h-px mx-1 ${s.n < step ? 'bg-nox-red/40' : 'bg-nox-border'}`} />}
+            </div>
           ))}
         </div>
 
-        {/* Step 1 */}
+        {/* Step 1: Account */}
         {step === 1 && (
-          <div className="animate-slide-up">
-            <h1 className="font-gaming text-xl text-white text-center mb-1 tracking-wider">CREATE ACCOUNT</h1>
-            <p className="text-nox-muted text-center text-sm mb-6">Step 1 of 3</p>
+          <div className="w-full max-w-md animate-slide-up">
+            <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">CREATE ACCOUNT</h1>
+            <p className="text-nox-muted text-center text-sm mb-6">Your credentials</p>
 
             {error && (
-              <div className="bg-nox-red/10 border border-nox-red/30 rounded-lg px-4 py-3 mb-4">
+              <div className="bg-nox-red/10 border border-nox-red/30 rounded-lg px-4 py-2.5 mb-4">
                 <p className="text-nox-red text-sm">{error}</p>
               </div>
             )}
 
-            <div className="space-y-3">
-              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                placeholder="Choose a username"
-                className="w-full glass rounded-lg px-4 py-3 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors" />
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email address"
-                className="w-full glass rounded-lg px-4 py-3 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors" />
-              
-              {/* Password with toggle */}
-              <div className="relative">
-                <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password (min 6 characters)"
-                  className="w-full glass rounded-lg px-4 py-3 pr-11 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-nox-muted hover:text-white transition-colors">
-                  {showPassword ? <RiEyeOffLine /> : <RiEyeLine />}
-                </button>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-nox-muted uppercase tracking-widest mb-2">Username</label>
+                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Choose a username"
+                  className="w-full glass rounded-lg px-4 py-3 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors" />
               </div>
-
-              <div className="relative">
-                <input type={showConfirm ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm password"
-                  onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
-                  className="w-full glass rounded-lg px-4 py-3 pr-11 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors" />
-                <button type="button" onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-nox-muted hover:text-white transition-colors">
-                  {showConfirm ? <RiEyeOffLine /> : <RiEyeLine />}
-                </button>
+              <div>
+                <label className="block text-xs text-nox-muted uppercase tracking-widest mb-2">Email</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="w-full glass rounded-lg px-4 py-3 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors" />
               </div>
-
+              <div>
+                <label className="block text-xs text-nox-muted uppercase tracking-widest mb-2">Password</label>
+                <div className="relative">
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Min 6 characters"
+                    className="w-full glass rounded-lg px-4 py-3 pr-10 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-nox-muted hover:text-white transition-colors">
+                    {showPassword ? <RiEyeOffLine /> : <RiEyeLine />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-nox-muted uppercase tracking-widest mb-2">Confirm Password</label>
+                <div className="relative">
+                  <input type={showConfirm ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repeat password"
+                    onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
+                    className="w-full glass rounded-lg px-4 py-3 pr-10 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors" />
+                  <button type="button" onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-nox-muted hover:text-white transition-colors">
+                    {showConfirm ? <RiEyeOffLine /> : <RiEyeLine />}
+                  </button>
+                </div>
+              </div>
               <button onClick={handleStep1}
-                className="w-full py-3 bg-nox-red hover:bg-nox-red-bright text-white font-gaming text-sm tracking-widest rounded-lg transition-all hover:shadow-[0_0_20px_rgba(255,45,85,0.3)]">
+                className="w-full py-3 bg-nox-red hover:bg-nox-red-bright text-white font-gaming tracking-widest rounded-lg transition-all hover:shadow-[0_0_20px_rgba(255,45,85,0.3)]">
                 NEXT →
               </button>
             </div>
-
-            <p className="text-center text-sm text-nox-muted mt-6">
-              Already have an account?{' '}
-              <Link to="/login" className="text-nox-red hover:text-nox-red-bright">Sign in</Link>
+            <p className="text-center text-sm text-nox-muted mt-5">
+              Have an account? <Link to="/login" className="text-nox-red hover:text-nox-red-bright">Sign in</Link>
             </p>
           </div>
         )}
 
-        {/* Step 2 */}
+        {/* Step 2: Games — FULL WIDTH */}
         {step === 2 && (
-          <div className="animate-slide-up">
-            <h1 className="font-gaming text-xl text-white text-center mb-1 tracking-wider">YOUR GAMES</h1>
-            <p className="text-nox-muted text-center text-sm mb-6">Pick the games you play</p>
+          <div className="w-full max-w-3xl animate-slide-up">
+            <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">YOUR GAMES</h1>
+            <p className="text-nox-muted text-center text-sm mb-6">Select the games you play</p>
 
-            <div className="grid grid-cols-2 gap-2 mb-6 max-h-80 overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
               {GAMES_LIST.map((game) => (
-                <button key={game.id} onClick={() => toggleGame(game.id)}
-                  className={`flex items-center gap-2 px-3 py-3 rounded-lg text-left text-sm transition-all ${
-                    selectedGames.includes(game.id)
-                      ? 'bg-nox-red-glow-strong border border-nox-red/40 text-white'
-                      : 'glass text-nox-muted hover:text-white hover:border-nox-red/20'
-                  }`}>
-                  <span className="text-lg">{game.icon}</span>
-                  <span className="font-medium text-xs">{game.name}</span>
-                </button>
+                <GameCard
+                  key={game.id}
+                  gameId={game.id}
+                  selected={selectedGames.includes(game.id)}
+                  onClick={() => toggleGame(game.id)}
+                />
               ))}
             </div>
 
-            <div className="flex gap-3">
-              <button onClick={() => setStep(1)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg text-sm hover:text-white transition-colors">← Back</button>
-              <button onClick={() => selectedGames.length > 0 && setStep(3)} disabled={selectedGames.length === 0}
-                className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-30 text-white font-gaming text-sm tracking-widest rounded-lg transition-all">
+            {/* Custom games */}
+            <div className="glass rounded-xl p-4 mb-4">
+              <p className="text-xs text-nox-muted uppercase tracking-widest mb-3">Don't see your game? Add it:</p>
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="text"
+                  value={customGameInput}
+                  onChange={(e) => setCustomGameInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addCustomGame()}
+                  placeholder="Type a game name..."
+                  className="flex-1 bg-nox-bg border border-nox-border rounded-lg px-3 py-2 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors"
+                />
+                <button onClick={addCustomGame} disabled={!customGameInput.trim()}
+                  className="px-4 py-2 bg-nox-red/20 border border-nox-red/30 text-nox-red rounded-lg hover:bg-nox-red/30 disabled:opacity-30 transition-all">
+                  <RiAddLine />
+                </button>
+              </div>
+              {customGames.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {customGames.map((game) => (
+                    <span key={game} className="flex items-center gap-1.5 px-3 py-1.5 bg-nox-red-glow border border-nox-red/30 rounded-lg text-xs text-nox-red">
+                      {game}
+                      <button onClick={() => removeCustomGame(game)} className="hover:text-white"><RiCloseLine /></button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs text-nox-subtle">
+                {totalGames} game{totalGames !== 1 ? 's' : ''} selected
+                {totalGames === 0 && ' — pick at least 1'}
+              </p>
+            </div>
+
+            <div className="flex gap-3 max-w-md mx-auto">
+              <button onClick={() => setStep(1)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
+              <button onClick={() => totalGames > 0 && setStep(3)} disabled={totalGames === 0}
+                className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-30 text-white font-gaming tracking-widest rounded-lg transition-all">
                 NEXT →
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 3 */}
+        {/* Step 3: Style — WIDER */}
         {step === 3 && (
-          <div className="animate-slide-up">
-            <h1 className="font-gaming text-xl text-white text-center mb-1 tracking-wider">YOUR STYLE</h1>
-            <p className="text-nox-muted text-center text-sm mb-6">Almost done!</p>
+          <div className="w-full max-w-2xl animate-slide-up">
+            <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">YOUR STYLE</h1>
+            <p className="text-nox-muted text-center text-sm mb-6">How do you play?</p>
 
-            <div className="grid grid-cols-2 gap-2 mb-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               {PLAYSTYLES.map((style) => (
                 <button key={style.id} onClick={() => setSelectedPlaystyle(style.id)}
-                  className={`p-3 rounded-lg text-left transition-all ${
+                  className={`p-4 rounded-xl text-left transition-all ${
                     selectedPlaystyle === style.id
                       ? 'bg-nox-red-glow-strong border border-nox-red/40 text-white'
                       : 'glass text-nox-muted hover:text-white hover:border-nox-red/20'
                   }`}>
-                  <span className="text-lg block mb-1">{style.icon}</span>
-                  <span className="font-medium text-xs block">{style.label}</span>
-                  <span className="text-[10px] text-nox-subtle block">{style.desc}</span>
+                  <span className="text-2xl block mb-2">{style.icon}</span>
+                  <span className="font-semibold text-sm block">{style.label}</span>
+                  <span className="text-[11px] text-nox-subtle block mt-1">{style.desc}</span>
                 </button>
               ))}
             </div>
 
-            <p className="text-nox-muted text-xs uppercase tracking-wider mb-3">What do you want from Nexus?</p>
-            <div className="grid grid-cols-3 gap-2 mb-6">
+            <p className="text-xs text-nox-muted uppercase tracking-widest mb-3">What do you want from Nexus?</p>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
               {GOALS.map((goal) => (
                 <button key={goal.id} onClick={() => toggleGoal(goal.id)}
-                  className={`p-2 rounded-lg text-center transition-all ${
+                  className={`p-3 rounded-xl text-center transition-all ${
                     selectedGoals.includes(goal.id)
                       ? 'bg-nox-red-glow-strong border border-nox-red/40 text-white'
                       : 'glass text-nox-muted hover:text-white hover:border-nox-red/20'
                   }`}>
-                  <span className="text-lg block">{goal.icon}</span>
-                  <span className="text-[10px] font-medium">{goal.label}</span>
+                  <span className="text-xl block mb-1">{goal.icon}</span>
+                  <span className="text-[11px] font-medium">{goal.label}</span>
                 </button>
               ))}
             </div>
 
             {error && (
-              <div className="bg-nox-red/10 border border-nox-red/30 rounded-lg px-4 py-3 mb-4">
+              <div className="bg-nox-red/10 border border-nox-red/30 rounded-lg px-4 py-2.5 mb-4">
                 <p className="text-nox-red text-sm">{error}</p>
               </div>
             )}
 
-            <div className="flex gap-3">
-              <button onClick={() => setStep(2)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg text-sm hover:text-white transition-colors">← Back</button>
+            <div className="flex gap-3 max-w-md mx-auto">
+              <button onClick={() => setStep(2)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
               <button onClick={handleComplete} disabled={isLoading}
-                className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-30 text-white font-gaming text-sm tracking-widest rounded-lg transition-all hover:shadow-[0_0_20px_rgba(255,45,85,0.3)]">
+                className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-30 text-white font-gaming tracking-widest rounded-lg transition-all hover:shadow-[0_0_20px_rgba(255,45,85,0.3)]">
                 {isLoading ? 'CREATING...' : 'ENTER NEXUS →'}
               </button>
             </div>
