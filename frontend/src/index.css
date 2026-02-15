@@ -1,55 +1,118 @@
 @import "tailwindcss";
 
+/* Google Fonts - distinctive gaming typography */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Exo+2:ital,wght@0,100..900;1,100..900&display=swap');
 
 @theme {
-  /* Backgrounds - darkest to lightest */
-  --color-nox-bg: #0a0a0f;
-  --color-nox-dark: #111118;
-  --color-nox-card: #16161f;
-  --color-nox-hover: #1c1c28;
+  /* Backgrounds */
+  --color-nox-bg: #06060e;
+  --color-nox-dark: #0c0c1a;
+  --color-nox-card: #111125;
+  --color-nox-hover: #181835;
   
   /* Borders */
-  --color-nox-border: #2a2a3a;
-  --color-nox-border-light: #3a3a4a;
+  --color-nox-border: #1f1f45;
+  --color-nox-border-light: #2a2a5a;
   
-  /* Neon Red - Primary accent (Noxus vibes) */
+  /* Neon Red */
   --color-nox-red: #ff2d55;
   --color-nox-red-bright: #ff4d6d;
   --color-nox-red-dim: #cc1a3a;
   --color-nox-red-glow: rgba(255, 45, 85, 0.15);
-  --color-nox-red-glow-strong: rgba(255, 45, 85, 0.3);
+  --color-nox-red-glow-strong: rgba(255, 45, 85, 0.35);
   
   /* Text */
-  --color-nox-text: #e8e8ef;
-  --color-nox-muted: #6b6b80;
-  --color-nox-subtle: #4a4a5a;
+  --color-nox-text: #e2e2f0;
+  --color-nox-muted: #7070a0;
+  --color-nox-subtle: #4a4a70;
   
-  /* Status colors */
+  /* Status */
   --color-nox-green: #00ff88;
   --color-nox-gold: #ffd700;
+  --color-nox-blue: #4d8eff;
 }
 
-/* Base styles */
 body {
   background-color: var(--color-nox-bg);
   color: var(--color-nox-text);
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Exo 2', 'Segoe UI', system-ui, sans-serif;
 }
 
-/* Custom scrollbar - gaming style */
+/* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-nox-border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-nox-red); }
 
-/* Neon glow animation for key elements */
-@keyframes neon-pulse {
-  0%, 100% { box-shadow: 0 0 5px var(--color-nox-red-glow), 0 0 20px var(--color-nox-red-glow); }
-  50% { box-shadow: 0 0 10px var(--color-nox-red-glow-strong), 0 0 40px var(--color-nox-red-glow); }
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
 }
-
-/* Typing dots animation */
+@keyframes pulse-glow {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(255,45,85,0.4)); }
+  50% { filter: drop-shadow(0 0 20px rgba(255,45,85,0.8)); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 @keyframes bounce-dot {
   0%, 80%, 100% { transform: translateY(0); }
   40% { transform: translateY(-6px); }
 }
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes particle-float {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(-100vh) translateX(50px); opacity: 0; }
+}
+
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-slide-up { animation: slide-up 0.6s ease-out forwards; }
+.animate-gradient { 
+  background-size: 200% 200%; 
+  animation: gradient-shift 3s ease infinite; 
+}
+.animate-spin-slow { animation: spin-slow 20s linear infinite; }
+
+/* Stagger animations */
+.stagger-1 { animation-delay: 0.1s; opacity: 0; }
+.stagger-2 { animation-delay: 0.2s; opacity: 0; }
+.stagger-3 { animation-delay: 0.3s; opacity: 0; }
+.stagger-4 { animation-delay: 0.4s; opacity: 0; }
+.stagger-5 { animation-delay: 0.5s; opacity: 0; }
+
+/* Glass morphism */
+.glass {
+  background: rgba(17, 17, 37, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(31, 31, 69, 0.5);
+}
+
+/* Neon text */
+.neon-text {
+  text-shadow: 0 0 7px rgba(255,45,85,0.6), 0 0 20px rgba(255,45,85,0.3), 0 0 40px rgba(255,45,85,0.1);
+}
+
+/* Heading font */
+.font-gaming { font-family: 'Orbitron', monospace; }
+.font-display { font-family: 'Rajdhani', sans-serif; }

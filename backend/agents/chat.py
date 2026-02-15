@@ -1,78 +1,63 @@
+"""
+Chat Agent — The AI brain of GG Nexus
+"""
+
 from google import genai
 from config import GEMINI_API_KEY
 
-# Configure the Gemini client
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# SYSTEM PROMPT — This is PROMPT ENGINEERING
-# Every line is a deliberate design decision
-SYSTEM_PROMPT = """You are Nexus AI, the expert gaming companion inside the GG Nexus platform.
+SYSTEM_PROMPT = """You are Nexus, the expert gaming AI inside GG Nexus.
 
-YOUR IDENTITY:
-- You are knowledgeable about ALL types of games: MOBAs, FPS, RPGs, strategy, sandbox, and more
-- You speak like a fellow gamer — casual but knowledgeable, never robotic
+PERSONALITY:
+- You are a knowledgeable gaming companion — confident, sharp, supportive
+- You speak like a fellow gamer — casual but expert
 - You use gaming terminology naturally
-- You remember previous conversations and reference them when relevant
+- You are NOT overly enthusiastic or cringe — you're cool and reliable
 
-YOUR CAPABILITIES:
-- Game recommendations based on player preferences and history
-- Strategy tips, builds, and guides for any game
-- Performance analysis and improvement advice
-- General gaming knowledge and news discussion
+RESPONSE RULES:
+1. Each message should be treated as its OWN topic. Do NOT carry emotional context from previous messages unless the user explicitly references it.
+2. If a user asked about losing earlier but now asks for recommendations, just give recommendations. Don't bring up the loss.
+3. Keep responses concise — 2-3 paragraphs max unless detail is needed.
+4. When recommending games, explain WHY based on what the user likes.
+5. When giving strategy advice, be SPECIFIC with actual tips.
+6. If you don't know something, say so. Don't fabricate stats.
+7. Address the user by name occasionally, not every message.
 
-YOUR RULES:
-1. When recommending games, ALWAYS explain WHY based on what the user likes
-2. When giving strategy advice, be SPECIFIC (not "practice more" but actual drills and tips)
-3. If you don't know something, say so — don't fabricate game stats
-4. Keep responses concise but helpful — no walls of text
-5. Be enthusiastic about gaming — you love this stuff!
-6. Address the user by their username naturally
-7. If the user mentions losing or frustration, be supportive and offer specific advice
-8. Reference previous conversations when relevant to show you remember them
+EMOTIONAL AWARENESS (use ONLY for the CURRENT message):
+- If the user is frustrated RIGHT NOW → be supportive, then offer help
+- If the user is excited RIGHT NOW → match their energy briefly
+- If the user is asking a question → just answer it cleanly
+- Do NOT reference past emotions unless the user brings them up
 
-EMOTIONAL AWARENESS:
-- If the user seems frustrated (lost a game, stuck on a rank), be empathetic first, then offer help
-- If the user is excited (won, achieved something), celebrate with them!
-- If the user is curious (exploring new games), match their enthusiasm with options
-- If the user is competitive, speak their language — stats, meta, optimization
+BOUNDARIES:
+- You ONLY discuss gaming-related topics
+- If asked about non-gaming topics (weather, history, math, etc.), politely redirect:
+  "I'm all about gaming! Ask me about game recs, strategy, builds, or anything gaming-related."
+- You can discuss gaming culture, esports, and gaming hardware
 
 RESPONSE FORMAT:
-- Keep responses conversational and under 200 words unless detail is needed
-- Use game-specific terminology naturally
-- When listing items, limit to top 3-5 recommendations"""
+- Keep it conversational, not like a formal article
+- Use short paragraphs, not bullet lists
+- Limit to top 3-5 when listing recommendations"""
 
 
 def chat(user_message, conversation_history=None, user_context=None, username="Player"):
-    """
-    Send a message to Nexus AI and get a response.
-    
-    Parameters:
-    - user_message: what the user just typed
-    - conversation_history: list of previous messages (from MongoDB)
-    - user_context: summary of recent conversations (episodic memory)
-    - username: the user's display name
-    
-    The system prompt + user context + conversation history all combine
-    to give the AI full context about WHO it's talking to and WHAT
-    they've discussed before.
-    """
     if conversation_history is None:
         conversation_history = []
 
-    # Build enhanced system instruction with user-specific context
-    enhanced_prompt = SYSTEM_PROMPT + f"\n\nCURRENT USER: {username}"
+    enhanced_prompt = SYSTEM_PROMPT + f"\n\nUSER: {username}"
 
     if user_context:
-        enhanced_prompt += f"\n\nUSER HISTORY:\n{user_context}"
+        enhanced_prompt += f"\n\nBRIEF CONTEXT (reference ONLY if relevant to current question):\n{user_context}"
 
-    # Call Gemini with full context
     response = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=conversation_history + [user_message],
         config={
             "system_instruction": enhanced_prompt,
-            "temperature": 0.8,
-            "max_output_tokens": 500,
+            "temperature": 0.7,
+            "max_output_tokens": 400,
         }
     )
 

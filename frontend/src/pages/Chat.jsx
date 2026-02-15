@@ -1,168 +1,244 @@
 import { useState, useRef, useEffect } from 'react';
-import { RiSendPlaneFill, RiRobot2Line, RiUser3Line } from 'react-icons/ri';
-import { sendMessage } from '../services/api';
+import { RiSendPlaneFill, RiAddLine } from 'react-icons/ri';
+import { sendMessage, newSession, getSessionId, getSessionHistory } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import BotAvatar from '../components/BotAvatar';
 
-/**
- * Chat Page - The core of GG Nexus
- * 
- * This is where users interact with Nexus AI. 
- * 
- * CURRENT (Phase 1): Simple chat with prompt engineering.
- * PHASE 2: Agent will use RAG (retrieve game data) + Tools + ReAct loop
- * PHASE 3: Multi-agent orchestration — different specialist agents
- * 
- * React concepts used:
- * - useState: manages messages, input text, loading state
- * - useRef: auto-scrolls to bottom, focuses input after send
- * - useEffect: triggers scroll whenever messages change
- */
+function detectMood(message) {
+  const lower = message.toLowerCase();
+  if (/lost|lose|tilted|frustrated|stuck|bad|hate|suck|died|feed|angry|sad/.test(lower)) return 'empathy';
+  if (/won|win|clutch|carry|rank up|promoted|mvp|ace|penta|amazing|great|awesome|nice/.test(lower)) return 'happy';
+  if (/recommend|suggest|what should|new game|try|discover|looking for|best|which/.test(lower)) return 'excited';
+  return 'idle';
+}
 
 export default function Chat() {
-  // STATE — these are React's way of tracking data that changes
-  // When state changes, React automatically re-renders the component
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: "Welcome to the Nexus. I'm your AI gaming companion — I know MOBAs, FPS, strategy, sandbox, and everything in between. Ask me for game recs, strategy tips, build guides, or just talk gaming. What's on your mind? 🎮"
-    }
-  ]);
-  const [input, setInput] = useState('');           // What the user is typing
-  const [isLoading, setIsLoading] = useState(false); // Is the AI thinking?
+  const { user } = useAuth();
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [botMood, setBotMood] = useState('happy');
+  const [initialLoad, setInitialLoad] = useState(true);
+  const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
-  // REFS — direct references to DOM elements (like document.getElementById in vanilla JS)
-  const messagesEndRef = useRef(null);  // Points to bottom of chat
-  const inputRef = useRef(null);        // Points to the text input
+  // Load conversation from MongoDB on mount (survives refresh!)
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const sessionId = getSessionId();
+        const data = await getSessionHistory(sessionId);
 
-  // EFFECT — runs whenever messages array changes
-  // Scrolls to the newest message automatically
+        if (data.messages && data.messages.length > 0) {
+          setMessages(data.messages.map(m => ({
+            role: m.role,
+            content: m.content
+          })));
+        } else {
+          const name = user?.username || 'Player';
+          setMessages([{
+            role: 'assistant',
+            content: `What's good, ${name}. I'm Nexus — your gaming companion. I know your games, I learn your playstyle, and I get better every time we talk. What can I help you with?`
+          }]);
+        }
+      } catch {
+        const name = user?.username || 'Player';
+        setMessages([{
+          role: 'assistant',
+          content: `What's good, ${name}. I'm Nexus — your gaming companion. What can I help you with?`
+        }]);
+      } finally {
+        setInitialLoad(false);
+      }
+    };
+
+    loadHistory();
+  }, [user]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // HANDLER — called when user sends a message
   const handleSend = async () => {
     const userMessage = input.trim();
-    if (!userMessage || isLoading) return; // Don't send empty or while loading
+    if (!userMessage || isLoading) return;
 
-    // 1. Add user message to chat immediately (optimistic update)
+    setBotMood('thinking');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setInput('');        // Clear input
-    setIsLoading(true);  // Show loading animation
+    setInput('');
+    setIsLoading(true);
 
     try {
-      // 2. Send to our Flask backend → which sends to Gemini
       const data = await sendMessage(userMessage);
-
-      // 3. Add AI response to chat
+      const responseMood = detectMood(data.response);
+      const userMood = detectMood(userMessage);
+      setBotMood(responseMood !== 'idle' ? responseMood : userMood !== 'idle' ? userMood : 'happy');
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
-    } catch (error) {
-      // 4. Handle errors gracefully
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: "Connection lost. Make sure the backend server is running (python app.py on port 5000)."
-      }]);
+    } catch (err) {
+      setBotMood('empathy');
+      const errMsg = err.response?.data?.error || "Something went wrong. Make sure the backend is running.";
+      setMessages(prev => [...prev, { role: 'assistant', content: errMsg }]);
     } finally {
       setIsLoading(false);
-      inputRef.current?.focus(); // Put cursor back in input
+      inputRef.current?.focus();
     }
   };
 
-  // Send on Enter key (Shift+Enter for new line)
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+  const handleNewChat = () => {
+    newSession();
+    const name = user?.username || 'Player';
+    setMessages([{
+      role: 'assistant',
+      content: `Fresh session! What's on your mind, ${name}?`
+    }]);
+    setBotMood('happy');
   };
+
+  if (initialLoad) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-nox-bg">
+        <BotAvatar mood="thinking" size={80} />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen bg-nox-bg">
       
-      {/* Chat Header */}
-      <div className="border-b border-nox-border bg-nox-dark/80 backdrop-blur-sm p-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-nox-red-glow border border-nox-red/20 flex items-center justify-center">
-            <RiRobot2Line className="text-nox-red text-xl" />
+      {/* Header */}
+      <div className="border-b border-nox-border bg-nox-dark/90 backdrop-blur-md px-4 py-3 shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <BotAvatar mood={botMood} size={44} />
+            <div>
+              <h1 className="font-gaming text-sm text-white tracking-wider">NEXUS</h1>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-nox-green animate-pulse"></span>
+                <p className="text-[10px] text-nox-muted font-display tracking-wider">
+                  {isLoading ? 'THINKING...' : botMood === 'happy' ? 'READY' : botMood === 'empathy' ? 'LISTENING' : botMood === 'excited' ? 'HYPED' : 'ONLINE'}
+                </p>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-white">Nexus AI</h1>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-nox-green animate-pulse"></span>
-              <p className="text-xs text-nox-muted">Powered by Gemini — Phase 1: Prompt Engineering</p>
+          <button onClick={handleNewChat}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-nox-muted hover:text-white hover:bg-nox-hover transition-all text-xs">
+            <RiAddLine />
+            <span className="hidden md:inline">New Chat</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Messages with bot always visible on left */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="flex h-full">
+          
+          {/* Bot column — always visible */}
+          <div className="hidden lg:flex w-48 flex-col items-center pt-8 shrink-0 border-r border-nox-border/30">
+            <div className="sticky top-8">
+              <BotAvatar mood={botMood} size={120} />
+              <p className="font-gaming text-[10px] text-nox-subtle text-center mt-3 tracking-widest">NEXUS</p>
+              <p className="text-[10px] text-nox-muted text-center mt-1">
+                {botMood === 'happy' && '😊 Feeling good'}
+                {botMood === 'empathy' && '💙 Here for you'}
+                {botMood === 'excited' && '🔥 Let\'s go!'}
+                {botMood === 'thinking' && '🤔 Processing...'}
+                {botMood === 'idle' && '👋 Ready'}
+              </p>
+            </div>
+          </div>
+
+          {/* Chat area */}
+          <div className="flex-1 px-4 lg:px-6 py-4">
+            {/* Intro when conversation is short */}
+            {messages.length <= 1 && (
+              <div className="flex flex-col items-center py-6 mb-4 lg:hidden">
+                <BotAvatar mood="happy" size={90} />
+                <p className="font-gaming text-[10px] text-nox-subtle mt-3 tracking-widest">YOUR GAMING COMPANION</p>
+              </div>
+            )}
+
+            <div className="max-w-2xl mx-auto space-y-4">
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  style={{ animation: `${msg.role === 'user' ? 'slide-in-right' : 'slide-in-left'} 0.3s ease-out forwards` }}
+                >
+                  {msg.role === 'assistant' && (
+                    <div className="w-8 h-8 rounded-lg bg-nox-red-glow border border-nox-red/20 flex items-center justify-center shrink-0 mt-1">
+                      <span className="text-nox-red text-xs font-gaming">N</span>
+                    </div>
+                  )}
+
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                    msg.role === 'user'
+                      ? 'bg-gradient-to-br from-nox-red to-nox-red-dim text-white rounded-br-sm'
+                      : 'glass text-nox-text rounded-bl-sm'
+                  }`}>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+
+                  {msg.role === 'user' && (
+                    <div className="w-8 h-8 rounded-lg bg-nox-hover border border-nox-border flex items-center justify-center shrink-0 mt-1">
+                      <span className="text-nox-muted text-xs font-gaming">{user?.username?.charAt(0).toUpperCase() || 'P'}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {isLoading && (
+                <div className="flex gap-3 justify-start" style={{ animation: 'slide-in-left 0.3s ease-out forwards' }}>
+                  <div className="w-8 h-8 rounded-lg bg-nox-red-glow border border-nox-red/20 flex items-center justify-center shrink-0">
+                    <span className="text-nox-red text-xs font-gaming">N</span>
+                  </div>
+                  <div className="glass rounded-2xl rounded-bl-sm px-5 py-4">
+                    <div className="flex gap-1.5 items-center">
+                      <span className="w-2 h-2 bg-nox-red rounded-full" style={{ animation: 'bounce-dot 1.4s ease-in-out infinite' }}></span>
+                      <span className="w-2 h-2 bg-nox-red rounded-full" style={{ animation: 'bounce-dot 1.4s ease-in-out infinite 0.2s' }}></span>
+                      <span className="w-2 h-2 bg-nox-red rounded-full" style={{ animation: 'bounce-dot 1.4s ease-in-out infinite 0.4s' }}></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4">
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            
-            {/* AI avatar */}
-            {msg.role === 'assistant' && (
-              <div className="w-8 h-8 rounded-lg bg-nox-red-glow border border-nox-red/20 flex items-center justify-center shrink-0 mt-1">
-                <RiRobot2Line className="text-nox-red text-sm" />
-              </div>
-            )}
-
-            {/* Message bubble */}
-            <div className={`max-w-[75%] rounded-2xl px-4 py-3 ${
-              msg.role === 'user'
-                ? 'bg-nox-red text-white rounded-br-sm'
-                : 'bg-nox-card border border-nox-border text-nox-text rounded-bl-sm'
-            }`}>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-            </div>
-
-            {/* User avatar */}
-            {msg.role === 'user' && (
-              <div className="w-8 h-8 rounded-lg bg-nox-hover border border-nox-border flex items-center justify-center shrink-0 mt-1">
-                <RiUser3Line className="text-nox-muted text-sm" />
-              </div>
-            )}
+      {/* Quick suggestions */}
+      {messages.length <= 1 && (
+        <div className="px-4 pb-2 shrink-0">
+          <div className="max-w-2xl mx-auto flex flex-wrap gap-2 justify-center">
+            {[
+              "Recommend me a new game 🎮",
+              "Help me improve at Valorant 🎯",
+              "What's the current LoL meta? ⚔️",
+              "I just lost 5 ranked games 😤"
+            ].map((s) => (
+              <button key={s} onClick={() => { setInput(s); inputRef.current?.focus(); }}
+                className="px-3 py-2 text-xs glass rounded-lg text-nox-muted hover:text-nox-red hover:border-nox-red/30 transition-all">
+                {s}
+              </button>
+            ))}
           </div>
-        ))}
+        </div>
+      )}
 
-        {/* Loading Animation — Three bouncing dots */}
-        {isLoading && (
-          <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-lg bg-nox-red-glow border border-nox-red/20 flex items-center justify-center shrink-0">
-              <RiRobot2Line className="text-nox-red text-sm" />
-            </div>
-            <div className="bg-nox-card border border-nox-border rounded-2xl rounded-bl-sm px-4 py-3">
-              <div className="flex gap-1.5 items-center h-5">
-                <span className="w-2 h-2 bg-nox-red rounded-full" style={{ animation: 'bounce-dot 1.4s ease-in-out infinite', animationDelay: '0ms' }}></span>
-                <span className="w-2 h-2 bg-nox-red rounded-full" style={{ animation: 'bounce-dot 1.4s ease-in-out infinite', animationDelay: '200ms' }}></span>
-                <span className="w-2 h-2 bg-nox-red rounded-full" style={{ animation: 'bounce-dot 1.4s ease-in-out infinite', animationDelay: '400ms' }}></span>
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Area */}
-      <div className="border-t border-nox-border bg-nox-dark/80 backdrop-blur-sm p-4 shrink-0">
-        <div className="flex gap-3 max-w-4xl mx-auto">
+      {/* Input */}
+      <div className="border-t border-nox-border bg-nox-dark/90 backdrop-blur-md p-4 shrink-0">
+        <div className="flex gap-3 max-w-2xl mx-auto">
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask Nexus AI anything about gaming..."
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            placeholder={`Ask Nexus anything about gaming...`}
             rows={1}
-            className="flex-1 bg-nox-card border border-nox-border rounded-xl px-4 py-3 text-sm text-white 
-                       placeholder-nox-muted resize-none focus:outline-none focus:border-nox-red/50 
-                       transition-colors"
+            className="flex-1 glass rounded-xl px-4 py-3 text-sm text-white placeholder-nox-subtle resize-none focus:outline-none focus:border-nox-red/50 transition-colors"
           />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            className="px-4 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-20 
-                       disabled:cursor-not-allowed rounded-xl text-white transition-all duration-200 
-                       hover:shadow-[0_0_20px_rgba(255,45,85,0.3)]"
-          >
+          <button onClick={handleSend} disabled={!input.trim() || isLoading}
+            className="px-5 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-20 disabled:cursor-not-allowed rounded-xl text-white transition-all duration-200 hover:shadow-[0_0_20px_rgba(255,45,85,0.4)]">
             <RiSendPlaneFill className="text-lg" />
           </button>
         </div>
