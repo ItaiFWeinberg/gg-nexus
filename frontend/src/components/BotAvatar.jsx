@@ -6,7 +6,7 @@
  */
 
 export default function BotAvatar({ mood = 'idle', size = 120 }) {
-  const config = {
+ const config = {
     idle:       { glow: 0.25, eyeColor: '#ff2d55', pupil: true,  mouthType: 'none',    anim: 'animate-float' },
     thinking:   { glow: 0.45, eyeColor: '#ff6b8a', pupil: false, mouthType: 'dots',    anim: 'animate-pulse' },
     happy:      { glow: 0.55, eyeColor: '#ff4d6d', pupil: false, mouthType: 'smile',   anim: 'animate-float' },
@@ -15,6 +15,10 @@ export default function BotAvatar({ mood = 'idle', size = 120 }) {
     curious:    { glow: 0.35, eyeColor: '#ff5577', pupil: true,  mouthType: 'none',    anim: 'animate-float' },
     proud:      { glow: 0.6,  eyeColor: '#ff2d55', pupil: false, mouthType: 'smile',   anim: 'animate-float' },
     frustrated: { glow: 0.3,  eyeColor: '#cc2244', pupil: true,  mouthType: 'zigzag',  anim: '' },
+    playful:    { glow: 0.5,  eyeColor: '#ff6b8a', pupil: true,  mouthType: 'smile',   anim: 'animate-float' },
+    intense:    { glow: 0.65, eyeColor: '#ff0033', pupil: true,  mouthType: 'flat',    anim: '' },
+    supportive: { glow: 0.4,  eyeColor: '#ff6b8a', pupil: false, mouthType: 'smile',   anim: 'animate-float' },
+    impressed:  { glow: 0.7,  eyeColor: '#ff2d55', pupil: true,  mouthType: 'open',    anim: '' },
   };
 
   const c = config[mood] || config.idle;
@@ -23,17 +27,21 @@ export default function BotAvatar({ mood = 'idle', size = 120 }) {
   const eyeShape = {
     idle:       { ry: 3.5, rx: 4 },
     thinking:   { ry: 3, rx: 5 },
-    happy:      { ry: 0, rx: 0 },  // Arc eyes
+    happy:      { ry: 0, rx: 0 },
     empathy:    { ry: 4, rx: 3.5 },
     excited:    { ry: 5.5, rx: 5 },
     curious:    { ry: 4.5, rx: 3.5 },
-    proud:      { ry: 0, rx: 0 },  // Arc eyes
+    proud:      { ry: 0, rx: 0 },
     frustrated: { ry: 2.5, rx: 5 },
+    playful:    { ry: 0, rx: 0 },
+    intense:    { ry: 3, rx: 5.5 },
+    supportive: { ry: 0, rx: 0 },
+    impressed:  { ry: 6, rx: 5 },
   };
 
   const eye = eyeShape[mood] || eyeShape.idle;
-  const isArcEye = mood === 'happy' || mood === 'proud';
-
+  const isArcEye = mood === 'happy' || mood === 'proud' || mood === 'playful' || mood === 'supportive';
+  
   return (
     <div className={`relative ${c.anim}`} style={{ width: size, height: size }}>
       <div className="absolute inset-0 rounded-full blur-xl transition-all duration-700"

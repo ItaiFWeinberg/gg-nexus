@@ -101,7 +101,7 @@ export default function Signup() {
     <div className="min-h-screen bg-nox-bg relative overflow-hidden">
       <ParticleBackground />
 
-      <div className="relative z-10 min-h-screen flex flex-col items-center px-4 py-6">
+      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <Link to="/landing"><NoxusLogo size={36} /></Link>

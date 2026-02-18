@@ -4,29 +4,34 @@ import { sendMessage, newSession, getSessionId, setSessionId, getSessionHistory,
 import { useAuth } from '../context/AuthContext';
 import BotAvatar from '../components/BotAvatar';
 
-// Enhanced mood detection — more keywords, more nuance
+const VALID_MOODS = ['happy', 'empathy', 'excited', 'thinking', 'curious', 'proud', 'frustrated', 'idle', 'playful', 'intense', 'supportive', 'impressed'];
+
+// Fallback mood detection if AI doesn't send a tag
 function detectMood(message) {
   const lower = message.toLowerCase();
-
-  // Frustration / sadness — check first (higher priority)
   if (/lost|lose|losing|tilted|frustrated|stuck|bad|hate|suck|died|feed|angry|sad|depressed|hopeless|trash|garbage|horrible|worst|demoted|deranked/.test(lower)) return 'empathy';
-
-  // Confusion / curiosity
   if (/what is|how does|how do|explain|what's the|curious|wondering|hmm|confused|difference between|tell me about/.test(lower)) return 'curious';
-
-  // Achievement / pride
   if (/won|win|clutch|carry|rank up|promoted|mvp|ace|penta|amazing|great|awesome|nice|finally|achieved|mastered|first time/.test(lower)) return 'proud';
-
-  // Excitement / high energy
   if (/recommend|suggest|what should|new game|try|discover|looking for|best|which|hype|excited|can't wait|love/.test(lower)) return 'excited';
-
-  // Frustration at game (not sad, just annoyed)
   if (/broken|op|nerf|unfair|bs|buggy|lag|cheat|toxic|elo hell|team diff/.test(lower)) return 'frustrated';
-
-  // Happy / positive
   if (/thanks|thank you|helpful|good|cool|fun|enjoy|appreciate|lol|haha|lmao/.test(lower)) return 'happy';
-
   return 'idle';
+}
+
+// Parse [MOOD:xxx] tag from AI response, return { mood, text }
+function parseMoodTag(response) {
+  const match = response.match(/^\[MOOD:(\w+)\]\s*/i);
+  if (match && VALID_MOODS.includes(match[1].toLowerCase())) {
+    return {
+      mood: match[1].toLowerCase(),
+      text: response.replace(match[0], '').trim()
+    };
+  }
+  return { mood: null, text: response };
+}
+
+function stripMoodTags(text) {
+  return text.replace(/\[MOOD:\w+\]\s*/gi, '').trim();
 }
 
 function formatTimeAgo(isoString) {
@@ -54,7 +59,6 @@ export default function Chat() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Load conversation on mount
   useEffect(() => {
     const loadHistory = async () => {
       try {
@@ -62,7 +66,6 @@ export default function Chat() {
         const data = await getSessionHistory(sessionId);
         if (data.messages && data.messages.length > 0) {
           setMessages(data.messages.map(m => ({ role: m.role, content: m.content })));
-          // Set mood from last message
           const lastAssistant = [...data.messages].reverse().find(m => m.role === 'assistant');
           if (lastAssistant) setBotMood(detectMood(lastAssistant.content));
         } else {
@@ -106,10 +109,8 @@ export default function Chat() {
 
   const handleSwitchSession = async (sessionId) => {
     try {
-      // Update the API module's session ID FIRST (this was the bug)
       setSessionId(sessionId);
       setCurrentSessionId(sessionId);
-
       const data = await getSessionHistory(sessionId);
       if (data.messages && data.messages.length > 0) {
         setMessages(data.messages.map(m => ({ role: m.role, content: m.content })));
@@ -126,7 +127,6 @@ export default function Chat() {
     const userMessage = input.trim();
     if (!userMessage || isLoading) return;
 
-    const userMood = detectMood(userMessage);
     setBotMood('thinking');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setInput('');
@@ -134,10 +134,26 @@ export default function Chat() {
 
     try {
       const data = await sendMessage(userMessage);
-      const responseMood = detectMood(data.response);
-      // Priority: response mood > user mood > default
-      setBotMood(responseMood !== 'idle' ? responseMood : userMood !== 'idle' ? userMood : 'happy');
-      setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+
+      let responseText = data.response;
+      let aiMood = data.mood || null;
+
+      if (!aiMood) {
+        const { mood: parsedMood, text: cleanText } = parseMoodTag(responseText);
+        aiMood = parsedMood;
+        responseText = cleanText;
+      }
+
+      const { text: finalText } = parseMoodTag(responseText);
+
+      if (aiMood && VALID_MOODS.includes(aiMood)) {
+        setBotMood(aiMood);
+      } else {
+        const fallback = detectMood(finalText);
+        setBotMood(fallback !== 'idle' ? fallback : 'happy');
+      }
+
+      setMessages(prev => [...prev, { role: 'assistant', content: finalText }]);
     } catch (err) {
       setBotMood('empathy');
       const errMsg = err.response?.data?.error || "Something went wrong. Make sure the backend is running.";
@@ -166,7 +182,8 @@ export default function Chat() {
   const moodLabel = {
     happy: '😊 Feeling good', empathy: '💙 Here for you', excited: '🔥 Let\'s go!',
     thinking: '🤔 Processing...', idle: '👋 Ready', curious: '🧐 Interesting...',
-    proud: '⭐ Nice!', frustrated: '😤 I hear you'
+    proud: '⭐ Nice!', frustrated: '😤 I hear you', playful: '😏 Having fun',
+    intense: '⚔️ Locked in', supportive: '💪 Got your back', impressed: '🤩 Whoa!'
   };
 
   return (
@@ -201,7 +218,7 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Main area with optional history sidebar */}
+      {/* Main area */}
       <div className="flex-1 flex overflow-hidden">
 
         {/* History sidebar */}
@@ -274,8 +291,7 @@ export default function Chat() {
                         ? 'bg-gradient-to-br from-nox-red to-nox-red-dim text-white rounded-br-sm'
                         : 'glass text-nox-text rounded-bl-sm'
                     }`}>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                    </div>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{stripMoodTags(msg.content)}</p>                    </div>
                     {msg.role === 'user' && (
                       <div className="w-7 h-7 rounded-lg bg-nox-hover border border-nox-border flex items-center justify-center shrink-0 mt-1">
                         <span className="text-nox-muted text-[10px] font-gaming">{user?.username?.charAt(0).toUpperCase() || 'P'}</span>

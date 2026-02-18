@@ -33,7 +33,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-nox-bg relative overflow-hidden flex items-center justify-center px-6">
       <ParticleBackground />
-      <div className="relative z-10 w-full max-w-sm">
+      <div className="relative z-10 w-full max-w-md">
         <div className="flex justify-center mb-3">
           <Link to="/landing"><NoxusLogo size={44} animated /></Link>
         </div>
@@ -41,7 +41,7 @@ export default function Login() {
           <BotAvatar mood="idle" size={80} />
         </div>
 
-        <h1 className="font-gaming text-xl text-white text-center mb-1 tracking-wider">WELCOME BACK</h1>
+        <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">WELCOME BACK</h1>
         <p className="text-nox-muted text-center text-sm mb-6">Sign in to continue</p>
 
         {error && (
