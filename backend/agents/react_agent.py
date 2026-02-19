@@ -1,3 +1,13 @@
+"""
+ReAct Agent — Reason + Act + Observe
+
+Implements the ReAct loop (Yao et al., 2023):
+  1. THOUGHT: Agent reasons about what data is needed
+  2. ACTION:  Agent selects and calls a tool
+  3. OBSERVATION: Agent receives tool output
+  4. Repeat or produce FINAL_ANSWER
+"""
+
 import json
 import re
 from google import genai
@@ -18,6 +28,17 @@ You have access to these tools that fetch LIVE, CURRENT data:
 IMPORTANT: Your tools fetch REAL data from APIs and AI search. Always use tools
 when answering game-specific questions — don't rely on your training data for
 meta, tier lists, or game-specific info.
+
+USER PROFILE (use this to personalize ALL responses):
+{profile}
+
+PERSONALIZATION RULES:
+1. Reference the user's rank when giving advice (e.g., "As a Gold player...")
+2. Tailor tips to their skill level — don't give beginner tips to Expert players.
+3. Focus on their main role when discussing game strategy.
+4. Align recommendations with their playstyle and goals.
+5. Proactively mention their games when relevant.
+6. On first interaction, give a personalized welcome referencing their profile.
 
 RESPONSE FORMAT:
 
@@ -50,6 +71,7 @@ I'm your gaming companion — I stick to games! Ask me about recs, strategy, bui
 
 
 def build_tools_description():
+    """Format tool definitions for injection into the system prompt."""
     lines = []
     for tool in TOOL_DEFINITIONS:
         params = (
@@ -61,7 +83,45 @@ def build_tools_description():
     return "\n".join(lines)
 
 
+def build_profile_block(user_data, username):
+    """Build the profile block for the system prompt."""
+    parts = [f"Name: {username}"]
+
+    if not user_data or not user_data.get("profile"):
+        parts.append("(No profile data — new user)")
+        return "\n".join(parts)
+
+    profile = user_data["profile"]
+
+    games = profile.get("favorite_games", [])
+    if games:
+        parts.append(f"Favorite games: {', '.join(games)}")
+
+    skill_levels = profile.get("skill_levels", {})
+    if skill_levels:
+        for game, level in skill_levels.items():
+            rank = profile.get("ranks", {}).get(game)
+            role = profile.get("main_roles", {}).get(game)
+            detail = f"  {game}: {level}"
+            if rank:
+                detail += f" | Rank: {rank}"
+            if role:
+                detail += f" | Main: {role}"
+            parts.append(detail)
+
+    playstyle = profile.get("playstyle", [])
+    if playstyle:
+        parts.append(f"Playstyle: {', '.join(playstyle)}")
+
+    goals = profile.get("goals", [])
+    if goals:
+        parts.append(f"Goals: {', '.join(goals)}")
+
+    return "\n".join(parts)
+
+
 def parse_agent_response(text):
+    """Extract THOUGHT, ACTION, ACTION_INPUT, and FINAL_ANSWER from agent output."""
     lines = text.strip().split("\n")
     result = {"thought": None, "action": None, "action_input": None, "final_answer": None}
 
@@ -108,6 +168,7 @@ def parse_agent_response(text):
 
 
 def strip_react_internals(text):
+    """Remove any ReAct formatting that leaked into user-facing text."""
     clean_lines = []
     for line in text.split("\n"):
         stripped = line.strip()
@@ -124,6 +185,7 @@ def strip_react_internals(text):
 
 
 def simple_fallback(messages, username):
+    """Bypass ReAct — direct Gemini call for when the agent loop fails."""
     try:
         response = client.models.generate_content(
             model="gemini-2.0-flash",
@@ -147,21 +209,13 @@ def simple_fallback(messages, username):
 def run_react_agent(
     user_message, conversation_history=None, user_data=None, username="Player", max_steps=4
 ):
+    """Execute the ReAct agent loop."""
     if conversation_history is None:
         conversation_history = []
 
     tools_desc = build_tools_description()
-    system_prompt = REACT_SYSTEM_PROMPT.format(tools=tools_desc)
-    system_prompt += f"\n\nCURRENT USER (use ONLY this name): {username}"
-
-    if user_data and user_data.get("profile"):
-        profile = user_data["profile"]
-        games = ", ".join(profile.get("favorite_games", [])) or "not set"
-        style = ", ".join(profile.get("playstyle", [])) or "not set"
-        goals = ", ".join(profile.get("goals", [])) or "not set"
-        system_prompt += f"\nUser's favorite games: {games}"
-        system_prompt += f"\nUser's playstyle: {style}"
-        system_prompt += f"\nUser's goals: {goals}"
+    profile_block = build_profile_block(user_data, username)
+    system_prompt = REACT_SYSTEM_PROMPT.format(tools=tools_desc, profile=profile_block)
 
     messages = conversation_history + [user_message]
     reasoning_trace = []
@@ -192,7 +246,6 @@ def run_react_agent(
         if parsed["thought"]:
             reasoning_trace.append({"type": "thought", "content": parsed["thought"]})
 
-        # --- FINAL ANSWER ---
         if parsed["final_answer"]:
             mood = "idle"
             answer = parsed["final_answer"]
@@ -211,7 +264,6 @@ def run_react_agent(
                 "tools_used": [t["content"] for t in reasoning_trace if t["type"] == "tool_call"],
             }
 
-        # --- TOOL CALL ---
         if parsed["action"] and parsed["action_input"]:
             tool_name = parsed["action"]
             tool_params = parsed["action_input"]
@@ -238,7 +290,6 @@ def run_react_agent(
             messages.append(observation_text)
             continue
 
-        # --- RAW TEXT (no action, no final answer) ---
         mood = "idle"
         answer = strip_react_internals(agent_text)
 
@@ -256,7 +307,6 @@ def run_react_agent(
             "tools_used": [],
         }
 
-    # --- MAX STEPS REACHED ---
     fallback = simple_fallback(conversation_history + [user_message], username)
     return {
         "response": fallback,

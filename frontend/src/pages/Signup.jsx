@@ -6,10 +6,11 @@ import NoxusLogo from '../components/NoxusLogo';
 import BotAvatar from '../components/BotAvatar';
 import ParticleBackground from '../components/ParticleBackground';
 import GameCard from '../components/GameCard';
-import { getGameData, getGameName } from '../components/gameData';
+import { getGameData, getGameName, getGameById, getSkillLevels } from '../components/gameData';
 import { RiEyeLine, RiEyeOffLine, RiAddLine, RiCloseLine } from 'react-icons/ri';
 
 const GAMES_LIST = getGameData();
+const SKILL_LEVELS = getSkillLevels();
 
 const PLAYSTYLES = [
   { id: 'competitive', label: 'Competitive', desc: 'I play to win and climb ranks', icon: '🏆' },
@@ -38,6 +39,7 @@ export default function Signup() {
   const [selectedGames, setSelectedGames] = useState([]);
   const [customGames, setCustomGames] = useState([]);
   const [customGameInput, setCustomGameInput] = useState('');
+  const [gameDetails, setGameDetails] = useState({});
   const [selectedPlaystyle, setSelectedPlaystyle] = useState('');
   const [selectedGoals, setSelectedGoals] = useState([]);
   const [error, setError] = useState('');
@@ -62,6 +64,13 @@ export default function Signup() {
 
   const totalGames = selectedGames.length + customGames.length;
 
+  const updateGameDetail = (gameId, field, value) => {
+    setGameDetails(prev => ({
+      ...prev,
+      [gameId]: { ...prev[gameId], [field]: value }
+    }));
+  };
+
   const handleStep1 = () => {
     setError('');
     if (username.length < 3) return setError('Username must be at least 3 characters');
@@ -78,14 +87,37 @@ export default function Signup() {
     setError('');
     try {
       await signup(savedCreds.username, savedCreds.email, savedCreds.password);
+
       const knownGames = selectedGames.map(id => getGameName(id));
       const allGames = [...knownGames, ...customGames];
+
+      const skillLevels = {};
+      const ranks = {};
+      const mainRoles = {};
+
+      selectedGames.forEach(id => {
+        const d = gameDetails[id] || {};
+        const name = getGameName(id);
+        if (d.skill) skillLevels[name] = d.skill;
+        if (d.rank) ranks[name] = d.rank;
+        if (d.role) mainRoles[name] = d.role;
+      });
+
+      customGames.forEach(name => {
+        const d = gameDetails[`custom_${name}`] || {};
+        if (d.skill) skillLevels[name] = d.skill;
+      });
+
       await updateProfile({
         favorite_games: allGames,
         playstyle: [selectedPlaystyle],
         goals: selectedGoals,
         platforms: ['PC'],
+        skill_levels: skillLevels,
+        ranks: ranks,
+        main_roles: mainRoles,
       });
+
       navigate('/chat');
     } catch (err) {
       setError(err.response?.data?.error || 'Signup failed.');
@@ -95,29 +127,38 @@ export default function Signup() {
     }
   };
 
-  const botMood = step === 1 ? 'idle' : step === 2 ? 'excited' : 'happy';
-  const botSpeech = step === 1 ? "Let's get you set up." : step === 2 ? 'Pick everything you play!' : 'Last step — how do you play?';
+  const stepConfig = [
+    { n: 1, label: 'Account' },
+    { n: 2, label: 'Games' },
+    { n: 3, label: 'Details' },
+    { n: 4, label: 'Style' },
+  ];
+
+  const botMoods = { 1: 'idle', 2: 'excited', 3: 'curious', 4: 'happy' };
+  const botSpeeches = {
+    1: "Let's get you set up.",
+    2: 'Pick everything you play!',
+    3: 'Tell me more about how you play.',
+    4: 'Last step — how do you game?',
+  };
 
   return (
     <div className="min-h-screen bg-nox-bg relative overflow-hidden">
       <ParticleBackground />
 
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-6">
+        {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <Link to="/landing"><NoxusLogo size={36} /></Link>
-          <BotAvatar mood={botMood} size={50} />
+          <BotAvatar mood={botMoods[step]} size={50} />
           <div className="glass rounded-lg px-3 py-1.5">
-            <p className="text-[11px] text-nox-muted">{botSpeech}</p>
+            <p className="text-[11px] text-nox-muted">{botSpeeches[step]}</p>
           </div>
         </div>
 
         {/* Step indicator */}
         <div className="flex items-center gap-1 mb-6">
-          {[
-            { n: 1, label: 'Account' },
-            { n: 2, label: 'Games' },
-            { n: 3, label: 'Style' },
-          ].map((s, i) => (
+          {stepConfig.map((s, i) => (
             <div key={s.n} className="flex items-center">
               <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
                 s.n === step ? 'bg-nox-red text-white' : s.n < step ? 'bg-nox-red/20 text-nox-red' : 'bg-nox-border/50 text-nox-subtle'
@@ -125,7 +166,7 @@ export default function Signup() {
                 <span className="font-bold">{s.n}</span>
                 <span className="hidden sm:inline">{s.label}</span>
               </div>
-              {i < 2 && <div className={`w-6 h-px mx-1 ${s.n < step ? 'bg-nox-red/40' : 'bg-nox-border'}`} />}
+              {i < stepConfig.length - 1 && <div className={`w-6 h-px mx-1 ${s.n < step ? 'bg-nox-red/40' : 'bg-nox-border'}`} />}
             </div>
           ))}
         </div>
@@ -230,12 +271,10 @@ export default function Signup() {
               )}
             </div>
 
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-xs text-nox-subtle">
-                {totalGames} game{totalGames !== 1 ? 's' : ''} selected
-                {totalGames === 0 && ' — pick at least 1'}
-              </p>
-            </div>
+            <p className="text-xs text-nox-subtle mb-4">
+              {totalGames} game{totalGames !== 1 ? 's' : ''} selected
+              {totalGames === 0 && ' — pick at least 1'}
+            </p>
 
             <div className="flex gap-3 max-w-md mx-auto">
               <button onClick={() => setStep(1)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
@@ -247,8 +286,127 @@ export default function Signup() {
           </div>
         )}
 
-        {/* Step 3: Playstyle & Goals */}
+        {/* Step 3: Game Details */}
         {step === 3 && (
+          <div className="w-full max-w-3xl animate-slide-up">
+            <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">YOUR DETAILS</h1>
+            <p className="text-nox-muted text-center text-sm mb-6">Tell Nexus your skill level, rank, and role for each game</p>
+
+            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1 mb-6">
+              {selectedGames.map((id) => {
+                const game = getGameById(id);
+                if (!game) return null;
+                const details = gameDetails[id] || {};
+                return (
+                  <div key={id} className="glass rounded-xl p-4" style={{ borderColor: `${game.accent}20` }}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs shrink-0"
+                        style={{ background: `${game.accent}15`, color: game.accent, border: `1px solid ${game.accent}30` }}>
+                        {game.abbr}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-white">{game.name}</p>
+                        <p className="text-[10px] text-nox-subtle">{game.genre}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Skill Level */}
+                      <div>
+                        <label className="block text-[10px] text-nox-muted uppercase tracking-widest mb-1.5">Skill Level</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {SKILL_LEVELS.map((skill) => (
+                            <button key={skill} onClick={() => updateGameDetail(id, 'skill', skill)}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                                details.skill === skill
+                                  ? 'text-white' : 'bg-nox-border/30 text-nox-subtle hover:text-white'
+                              }`}
+                              style={details.skill === skill ? { background: `${game.accent}30`, color: game.accent, border: `1px solid ${game.accent}50` } : {}}>
+                              {skill}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Rank */}
+                      {game.ranks.length > 0 && (
+                        <div>
+                          <label className="block text-[10px] text-nox-muted uppercase tracking-widest mb-1.5">Rank</label>
+                          <select value={details.rank || ''}
+                            onChange={(e) => updateGameDetail(id, 'rank', e.target.value)}
+                            className="w-full bg-nox-bg border border-nox-border rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-nox-red/50 transition-colors">
+                            <option value="">Select rank...</option>
+                            {game.ranks.map((r) => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Role */}
+                      {game.roles.length > 0 && (
+                        <div>
+                          <label className="block text-[10px] text-nox-muted uppercase tracking-widest mb-1.5">Main Role</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {game.roles.map((role) => (
+                              <button key={role} onClick={() => updateGameDetail(id, 'role', role)}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                                  details.role === role
+                                    ? 'text-white' : 'bg-nox-border/30 text-nox-subtle hover:text-white'
+                                }`}
+                                style={details.role === role ? { background: `${game.accent}30`, color: game.accent, border: `1px solid ${game.accent}50` } : {}}>
+                                {role}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Custom games — skill level only */}
+              {customGames.map((name) => {
+                const key = `custom_${name}`;
+                const details = gameDetails[key] || {};
+                return (
+                  <div key={key} className="glass rounded-xl p-4">
+                    <p className="text-sm font-semibold text-white mb-3">{name}</p>
+                    <div>
+                      <label className="block text-[10px] text-nox-muted uppercase tracking-widest mb-1.5">Skill Level</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {SKILL_LEVELS.map((skill) => (
+                          <button key={skill} onClick={() => updateGameDetail(key, 'skill', skill)}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                              details.skill === skill
+                                ? 'bg-nox-red-glow-strong text-nox-red border border-nox-red/50'
+                                : 'bg-nox-border/30 text-nox-subtle hover:text-white'
+                            }`}>
+                            {skill}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="text-[10px] text-nox-subtle text-center mb-4">
+              These details help Nexus give you rank-appropriate advice — skip any you're unsure about.
+            </p>
+
+            <div className="flex gap-3 max-w-md mx-auto">
+              <button onClick={() => setStep(2)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
+              <button onClick={() => setStep(4)}
+                className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright text-white font-gaming tracking-widest rounded-lg transition-all">
+                NEXT →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Playstyle & Goals */}
+        {step === 4 && (
           <div className="w-full max-w-2xl animate-slide-up">
             <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">YOUR STYLE</h1>
             <p className="text-nox-muted text-center text-sm mb-6">How do you play?</p>
@@ -290,7 +448,7 @@ export default function Signup() {
             )}
 
             <div className="flex gap-3 max-w-md mx-auto">
-              <button onClick={() => setStep(2)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
+              <button onClick={() => setStep(3)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
               <button onClick={handleComplete} disabled={isLoading}
                 className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-30 text-white font-gaming tracking-widest rounded-lg transition-all hover:shadow-[0_0_20px_rgba(255,45,85,0.3)]">
                 {isLoading ? 'CREATING...' : 'ENTER NEXUS →'}

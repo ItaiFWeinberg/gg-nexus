@@ -41,6 +41,44 @@ function formatTimeAgo(isoString) {
   return `${days}d ago`;
 }
 
+function buildWelcomeMessage(user) {
+  const profile = user?.profile || {};
+  const name = user?.username || 'Player';
+  const games = profile.favorite_games || [];
+  const ranks = profile.ranks || {};
+  const roles = profile.main_roles || {};
+  const playstyle = (profile.playstyle || [])[0] || '';
+  const goals = profile.goals || [];
+
+  if (games.length === 0) {
+    return `Hey ${name}! I'm Nexus, your gaming AI companion. Tell me what games you play and I'll help with builds, strategy, recommendations — anything gaming!`;
+  }
+
+  let msg = `Hey ${name}! `;
+
+  const gameDetails = games.slice(0, 3).map(g => {
+    let detail = g;
+    if (ranks[g]) detail += ` (${ranks[g]})`;
+    if (roles[g]) detail += ` — ${roles[g]} main`;
+    return detail;
+  });
+
+  msg += `I see you're into ${gameDetails.join(', ')}`;
+  if (games.length > 3) msg += ` and ${games.length - 3} more`;
+  msg += '. ';
+
+  if (playstyle === 'competitive') msg += "Competitive mindset — I respect it. ";
+  else if (playstyle === 'casual') msg += "Love the chill vibes. ";
+  else if (playstyle === 'explorer') msg += "Always finding new games — nice! ";
+
+  if (goals.includes('rank')) msg += "Ready to help you climb. ";
+  else if (goals.includes('improve')) msg += "Let's sharpen those skills. ";
+  else if (goals.includes('newgames')) msg += "I've got some great recommendations. ";
+
+  msg += "What can I help with today?";
+  return msg;
+}
+
 export default function Chat() {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
@@ -50,299 +88,228 @@ export default function Chat() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [sessions, setSessions] = useState([]);
-  const [currentSessionId, setCurrentSessionId] = useState(getSessionId());
+  const [currentSession, setCurrentSession] = useState(getSessionId());
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const showWelcome = useCallback(() => {
-    const name = user?.username || 'Player';
-    setMessages([{
-      role: 'assistant',
-      content: `What's good, ${name}. I'm Nexus — your gaming companion. What can I help you with?`
-    }]);
+    const welcomeText = buildWelcomeMessage(user);
+    setMessages([{ role: 'assistant', content: welcomeText }]);
     setBotMood('happy');
+    setInitialLoad(false);
   }, [user]);
 
   useEffect(() => {
-    const loadHistory = async () => {
-      try {
-        const sessionId = getSessionId();
-        const data = await getSessionHistory(sessionId);
-        if (data.messages && data.messages.length > 0) {
-          setMessages(data.messages.map(m => ({ role: m.role, content: m.content })));
-          const lastAssistant = [...data.messages].reverse().find(m => m.role === 'assistant');
-          if (lastAssistant) setBotMood(detectMood(lastAssistant.content));
-        } else {
-          showWelcome();
-        }
-      } catch {
-        showWelcome();
-      } finally {
-        setInitialLoad(false);
-      }
-    };
-    loadHistory();
-  }, [user, currentSessionId, showWelcome]);
+    if (initialLoad) showWelcome();
+  }, [initialLoad, showWelcome]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [isLoading]);
+
+  const handleSend = async () => {
+    const trimmed = input.trim();
+    if (!trimmed || isLoading) return;
+
+    const userMood = detectMood(trimmed);
+    setBotMood('thinking');
+
+    setMessages(prev => [...prev, { role: 'user', content: trimmed }]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const data = await sendMessage(trimmed);
+      let responseText = data.response;
+      let responseMood = data.mood || 'idle';
+
+      const parsed = parseMoodTag(responseText);
+      if (parsed.mood) {
+        responseMood = parsed.mood;
+        responseText = parsed.text;
+      }
+      responseText = stripMoodTags(responseText);
+
+      if (!VALID_MOODS.includes(responseMood)) responseMood = userMood;
+      setBotMood(responseMood);
+
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: responseText,
+          mood: responseMood,
+          agentInfo: data.agent_info,
+        },
+      ]);
+    } catch (err) {
+      const errorMsg = err.response?.status === 429
+        ? "I'm thinking hard — give me a sec and try again!"
+        : "Something went wrong. Try again?";
+      setBotMood('empathy');
+      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNewSession = () => {
+    const id = newSession();
+    setCurrentSession(id);
+    showWelcome();
+  };
+
+  const loadSession = async (sessionId) => {
+    try {
+      setSessionId(sessionId);
+      setCurrentSession(sessionId);
+      const data = await getSessionHistory(sessionId);
+      const msgs = (data.messages || []).map(m => ({
+        role: m.role,
+        content: stripMoodTags(m.content),
+      }));
+      setMessages(msgs.length > 0 ? msgs : [{ role: 'assistant', content: buildWelcomeMessage(user) }]);
+      setShowHistory(false);
+      setInitialLoad(false);
+    } catch {
+      setShowHistory(false);
+    }
+  };
 
   const loadSessions = async () => {
     try {
       const data = await getChatSessions();
       setSessions(data.sessions || []);
-    } catch {
-      setSessions([]);
-    }
+    } catch { /* ignore */ }
   };
 
-  const handleToggleHistory = () => {
+  const toggleHistory = () => {
     if (!showHistory) loadSessions();
     setShowHistory(!showHistory);
   };
 
-  const handleSwitchSession = async (sessionId) => {
-    try {
-      setSessionId(sessionId);
-      setCurrentSessionId(sessionId);
-      const data = await getSessionHistory(sessionId);
-      if (data.messages && data.messages.length > 0) {
-        setMessages(data.messages.map(m => ({ role: m.role, content: m.content })));
-        const lastAssistant = [...data.messages].reverse().find(m => m.role === 'assistant');
-        if (lastAssistant) setBotMood(detectMood(lastAssistant.content));
-      }
-      setShowHistory(false);
-    } catch {
-      /* session load failed silently */
-    }
-  };
-
-  const handleSend = async () => {
-    const userMessage = input.trim();
-    if (!userMessage || isLoading) return;
-
-    setBotMood('thinking');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setInput('');
-    setIsLoading(true);
-
-    try {
-      const data = await sendMessage(userMessage);
-
-      let responseText = data.response;
-      let aiMood = data.mood || null;
-
-      if (!aiMood) {
-        const { mood: parsedMood, text: cleanText } = parseMoodTag(responseText);
-        aiMood = parsedMood;
-        responseText = cleanText;
-      }
-
-      const { text: finalText } = parseMoodTag(responseText);
-
-      if (aiMood && VALID_MOODS.includes(aiMood)) {
-        setBotMood(aiMood);
-      } else {
-        const fallback = detectMood(finalText);
-        setBotMood(fallback !== 'idle' ? fallback : 'happy');
-      }
-
-      setMessages(prev => [...prev, { role: 'assistant', content: finalText }]);
-    } catch (err) {
-      setBotMood('empathy');
-      const errMsg = err.response?.data?.error || 'Something went wrong. Make sure the backend is running.';
-      setMessages(prev => [...prev, { role: 'assistant', content: errMsg }]);
-    } finally {
-      setIsLoading(false);
-      inputRef.current?.focus();
-    }
-  };
-
-  const handleNewChat = () => {
-    const sid = newSession();
-    setCurrentSessionId(sid);
-    showWelcome();
-    setShowHistory(false);
-  };
-
-  if (initialLoad) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-nox-bg">
-        <BotAvatar mood="thinking" size={80} />
-      </div>
-    );
-  }
-
-  const moodLabel = {
-    happy: '😊 Feeling good', empathy: '💙 Here for you', excited: '🔥 Let\'s go!',
-    thinking: '🤔 Processing...', idle: '👋 Ready', curious: '🧐 Interesting...',
-    proud: '⭐ Nice!', frustrated: '😤 I hear you', playful: '😏 Having fun',
-    intense: '⚔️ Locked in', supportive: '💪 Got your back', impressed: '🤩 Whoa!'
-  };
-
   return (
-    <div className="flex flex-col h-screen bg-nox-bg">
+    <div className="flex flex-col h-screen bg-linear-to-br from-nox-bg via-nox-dark to-nox-bg relative">
+
       {/* Header */}
-      <div className="border-b border-nox-border bg-nox-dark/90 backdrop-blur-md px-4 py-3 shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <BotAvatar mood={botMood} size={44} />
-            <div>
-              <h1 className="font-gaming text-sm text-white tracking-wider">NEXUS</h1>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-nox-green animate-pulse"></span>
-                <p className="text-[10px] text-nox-muted font-display tracking-wider">
-                  {isLoading ? 'THINKING...' : (moodLabel[botMood] || 'ONLINE')}
-                </p>
-              </div>
-            </div>
+      <div className="border-b border-nox-border px-4 py-3 flex items-center justify-between bg-nox-dark/80 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <BotAvatar mood={botMood} size={38} />
+          <div>
+            <h2 className="text-sm font-semibold text-white">Nexus AI</h2>
+            <p className="text-[10px] text-nox-muted">
+              {isLoading ? 'Thinking...' : botMood === 'idle' ? 'Ready' : botMood.charAt(0).toUpperCase() + botMood.slice(1)}
+            </p>
           </div>
-          <div className="flex items-center gap-1">
-            <button onClick={handleToggleHistory}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-nox-muted hover:text-white hover:bg-nox-hover transition-all text-xs">
-              <RiHistoryLine />
-              <span className="hidden md:inline">History</span>
-            </button>
-            <button onClick={handleNewChat}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-nox-muted hover:text-white hover:bg-nox-hover transition-all text-xs">
-              <RiAddLine />
-              <span className="hidden md:inline">New Chat</span>
-            </button>
-          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={toggleHistory} title="Chat history"
+            className="p-2 rounded-lg text-nox-muted hover:text-white hover:bg-nox-hover transition-colors">
+            <RiHistoryLine className="text-lg" />
+          </button>
+          <button onClick={handleNewSession} title="New chat"
+            className="p-2 rounded-lg text-nox-muted hover:text-nox-red hover:bg-nox-hover transition-colors">
+            <RiAddLine className="text-lg" />
+          </button>
         </div>
       </div>
 
-      {/* Main area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* History sidebar */}
-        {showHistory && (
-          <div className="w-72 border-r border-nox-border bg-nox-dark/50 flex flex-col shrink-0 animate-slide-up">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-nox-border">
-              <h2 className="font-gaming text-xs text-white tracking-wider">CONVERSATIONS</h2>
-              <button onClick={() => setShowHistory(false)} className="text-nox-muted hover:text-white"><RiCloseLine /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {sessions.length === 0 ? (
-                <p className="text-nox-subtle text-xs text-center py-8">No conversations yet</p>
-              ) : (
-                sessions.map((s) => (
-                  <button key={s.session_id} onClick={() => handleSwitchSession(s.session_id)}
-                    className={`w-full text-left p-3 rounded-lg transition-all ${
-                      s.session_id === currentSessionId
-                        ? 'bg-nox-red-glow border border-nox-red/20'
-                        : 'hover:bg-nox-hover'
-                    }`}>
-                    <div className="flex items-start gap-2">
-                      <RiChat3Line className="text-nox-muted mt-0.5 shrink-0 text-xs" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs text-white truncate font-medium">{s.title}</p>
-                        <p className="text-[10px] text-nox-subtle truncate mt-0.5">{s.preview}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[9px] text-nox-subtle">{s.message_count} msgs</span>
-                          <span className="text-[9px] text-nox-subtle">{formatTimeAgo(s.last_time)}</span>
-                        </div>
-                      </div>
+      {/* History sidebar */}
+      {showHistory && (
+        <div className="absolute top-14 right-2 z-50 w-72 max-h-96 bg-nox-card border border-nox-border rounded-xl shadow-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-nox-border">
+            <span className="text-xs text-nox-muted uppercase tracking-wider font-medium">History</span>
+            <button onClick={() => setShowHistory(false)} className="text-nox-muted hover:text-white">
+              <RiCloseLine />
+            </button>
+          </div>
+          <div className="overflow-y-auto max-h-80">
+            {sessions.length === 0 ? (
+              <p className="text-xs text-nox-subtle p-4 text-center">No past sessions</p>
+            ) : (
+              sessions.map((s) => (
+                <button key={s.session_id} onClick={() => loadSession(s.session_id)}
+                  className={`w-full text-left px-4 py-3 hover:bg-nox-hover transition-colors border-b border-nox-border/50 ${
+                    s.session_id === currentSession ? 'bg-nox-red-glow border-l-2 border-l-nox-red' : ''
+                  }`}>
+                  <div className="flex items-center gap-2">
+                    <RiChat3Line className="text-nox-subtle text-xs shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-white truncate">{s.preview || 'Chat session'}</p>
+                      <p className="text-[10px] text-nox-subtle">{s.message_count} msgs • {formatTimeAgo(s.last_message)}</p>
                     </div>
-                  </button>
-                ))
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            style={{ animation: `slide-in-${msg.role === 'user' ? 'right' : 'left'} 0.3s ease-out` }}>
+            {msg.role === 'assistant' && (
+              <div className="shrink-0 mt-1">
+                <BotAvatar mood={msg.mood || botMood} size={32} />
+              </div>
+            )}
+            <div className={`max-w-[75%] rounded-2xl px-4 py-3 ${
+              msg.role === 'user'
+                ? 'bg-nox-red text-white rounded-br-md'
+                : 'bg-nox-card border border-nox-border text-nox-text rounded-bl-md'
+            }`}>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+              {msg.agentInfo && msg.agentInfo.tools_used?.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-white/10">
+                  <p className="text-[10px] text-nox-subtle">
+                    Tools: {msg.agentInfo.tools_used.map(t => t.split('(')[0]).join(', ')}
+                  </p>
+                </div>
               )}
+            </div>
+          </div>
+        ))}
+
+        {isLoading && (
+          <div className="flex gap-3">
+            <BotAvatar mood="thinking" size={32} />
+            <div className="bg-nox-card border border-nox-border rounded-2xl rounded-bl-md px-4 py-3">
+              <div className="flex gap-1.5">
+                <div className="w-2 h-2 bg-nox-red rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-nox-red rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-nox-red rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
           </div>
         )}
 
-        {/* Chat area */}
-        <div className="flex-1 flex">
-          {/* Bot column — desktop only */}
-          <div className="hidden lg:flex w-44 flex-col items-center pt-8 shrink-0 border-r border-nox-border/30">
-            <div className="sticky top-8">
-              <BotAvatar mood={botMood} size={110} />
-              <p className="font-gaming text-[10px] text-nox-subtle text-center mt-3 tracking-widest">NEXUS</p>
-              <p className="text-[10px] text-nox-muted text-center mt-1">{moodLabel[botMood] || 'Ready'}</p>
-            </div>
-          </div>
+        <div ref={messagesEndRef} />
+      </div>
 
-          {/* Messages column */}
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-4">
-              {messages.length <= 1 && (
-                <div className="flex flex-col items-center py-6 mb-4 lg:hidden">
-                  <BotAvatar mood="happy" size={80} />
-                </div>
-              )}
-
-              <div className="max-w-2xl mx-auto space-y-4">
-                {messages.map((msg, i) => (
-                  <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    style={{ animation: `${msg.role === 'user' ? 'slide-in-right' : 'slide-in-left'} 0.3s ease-out forwards` }}>
-                    {msg.role === 'assistant' && (
-                      <div className="w-7 h-7 rounded-lg bg-nox-red-glow border border-nox-red/20 flex items-center justify-center shrink-0 mt-1">
-                        <span className="text-nox-red text-[10px] font-gaming">N</span>
-                      </div>
-                    )}
-                    <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                      msg.role === 'user'
-                        ? 'bg-linear-to-br from-nox-red to-nox-red-dim text-white rounded-br-sm'
-                        : 'glass text-nox-text rounded-bl-sm'
-                    }`}>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{stripMoodTags(msg.content)}</p>
-                    </div>
-                    {msg.role === 'user' && (
-                      <div className="w-7 h-7 rounded-lg bg-nox-hover border border-nox-border flex items-center justify-center shrink-0 mt-1">
-                        <span className="text-nox-muted text-[10px] font-gaming">{user?.username?.charAt(0).toUpperCase() || 'P'}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {isLoading && (
-                  <div className="flex gap-3 justify-start" style={{ animation: 'slide-in-left 0.3s ease-out forwards' }}>
-                    <div className="w-7 h-7 rounded-lg bg-nox-red-glow border border-nox-red/20 flex items-center justify-center shrink-0">
-                      <span className="text-nox-red text-[10px] font-gaming">N</span>
-                    </div>
-                    <div className="glass rounded-2xl rounded-bl-sm px-5 py-4">
-                      <div className="flex gap-1.5 items-center">
-                        <span className="w-2 h-2 bg-nox-red rounded-full" style={{ animation: 'bounce-dot 1.4s ease-in-out infinite' }}></span>
-                        <span className="w-2 h-2 bg-nox-red rounded-full" style={{ animation: 'bounce-dot 1.4s ease-in-out infinite 0.2s' }}></span>
-                        <span className="w-2 h-2 bg-nox-red rounded-full" style={{ animation: 'bounce-dot 1.4s ease-in-out infinite 0.4s' }}></span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            </div>
-
-            {/* Quick suggestions */}
-            {messages.length <= 1 && (
-              <div className="px-4 pb-2 shrink-0">
-                <div className="max-w-2xl mx-auto flex flex-wrap gap-2 justify-center">
-                  {['Recommend me a new game 🎮', 'Help me improve at Valorant 🎯', "What's the current LoL meta? ⚔️", 'I just lost 5 ranked games 😤'].map((s) => (
-                    <button key={s} onClick={() => { setInput(s); inputRef.current?.focus(); }}
-                      className="px-3 py-2 text-xs glass rounded-lg text-nox-muted hover:text-nox-red hover:border-nox-red/30 transition-all">
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Input */}
-            <div className="border-t border-nox-border bg-nox-dark/90 backdrop-blur-md p-4 shrink-0">
-              <div className="flex gap-3 max-w-2xl mx-auto">
-                <textarea ref={inputRef} value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                  placeholder="Ask Nexus anything about gaming..."
-                  rows={1}
-                  className="flex-1 glass rounded-xl px-4 py-3 text-sm text-white placeholder-nox-subtle resize-none focus:outline-none focus:border-nox-red/50 transition-colors" />
-                <button onClick={handleSend} disabled={!input.trim() || isLoading}
-                  className="px-5 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-20 disabled:cursor-not-allowed rounded-xl text-white transition-all duration-200 hover:shadow-[0_0_20px_rgba(255,45,85,0.4)]">
-                  <RiSendPlaneFill className="text-lg" />
-                </button>
-              </div>
-            </div>
-          </div>
+      {/* Input */}
+      <div className="border-t border-nox-border px-4 py-3 bg-nox-dark/80 backdrop-blur-md">
+        <div className="flex items-center gap-3 max-w-4xl mx-auto">
+          <input ref={inputRef} type="text" value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            placeholder="Ask Nexus anything about gaming..."
+            disabled={isLoading}
+            className="flex-1 bg-nox-card border border-nox-border rounded-xl px-4 py-3 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 disabled:opacity-50 transition-colors" />
+          <button onClick={handleSend} disabled={isLoading || !input.trim()}
+            className="p-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-30 rounded-xl transition-all hover:shadow-[0_0_15px_rgba(255,45,85,0.3)]">
+            <RiSendPlaneFill className="text-white text-lg" />
+          </button>
         </div>
       </div>
     </div>

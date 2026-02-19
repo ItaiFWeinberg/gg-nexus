@@ -26,6 +26,17 @@ def verify_password(password, hashed_password):
     )
 
 
+DEFAULT_PROFILE = {
+    "favorite_games": [],
+    "playstyle": [],
+    "platforms": ["PC"],
+    "goals": [],
+    "skill_levels": {},
+    "ranks": {},
+    "main_roles": {},
+}
+
+
 def create_user(username, email, password):
     """Create a new user. Returns sanitized user dict or None if duplicate."""
     if users_collection.find_one({"$or": [{"username": username}, {"email": email}]}):
@@ -35,13 +46,7 @@ def create_user(username, email, password):
         "username": username,
         "email": email,
         "password_hash": hash_password(password),
-        "profile": {
-            "favorite_games": [],
-            "playstyle": [],
-            "platforms": ["PC"],
-            "goals": [],
-            "skill_levels": {},
-        },
+        "profile": dict(DEFAULT_PROFILE),
         "preferences": {
             "genres": [],
             "play_sessions": "evening",
@@ -70,13 +75,64 @@ def find_user_by_id(user_id):
 
 
 def update_user_profile(user_id, profile_data):
-    """Update a user's gaming profile."""
+    """Merge incoming profile data into user's existing profile."""
     from bson import ObjectId
+
+    current = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not current:
+        return
+
+    existing = current.get("profile", dict(DEFAULT_PROFILE))
+
+    for key in DEFAULT_PROFILE:
+        if key in profile_data:
+            existing[key] = profile_data[key]
 
     users_collection.update_one(
         {"_id": ObjectId(user_id)},
-        {"$set": {"profile": profile_data, "last_active": datetime.utcnow()}},
+        {"$set": {"profile": existing, "last_active": datetime.utcnow()}},
     )
+
+
+def get_user_profile_summary(user_id):
+    """Build a rich text summary of the user's profile for the AI agent."""
+    from bson import ObjectId
+
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return "No profile data available."
+
+    profile = user.get("profile", {})
+    parts = [f"Username: {user.get('username', 'Player')}"]
+
+    games = profile.get("favorite_games", [])
+    if games:
+        parts.append(f"Favorite games: {', '.join(games)}")
+
+    skill_levels = profile.get("skill_levels", {})
+    if skill_levels:
+        skills_str = ", ".join(f"{g}: {l}" for g, l in skill_levels.items())
+        parts.append(f"Skill levels: {skills_str}")
+
+    ranks = profile.get("ranks", {})
+    if ranks:
+        ranks_str = ", ".join(f"{g}: {r}" for g, r in ranks.items())
+        parts.append(f"Current ranks: {ranks_str}")
+
+    main_roles = profile.get("main_roles", {})
+    if main_roles:
+        roles_str = ", ".join(f"{g}: {r}" for g, r in main_roles.items())
+        parts.append(f"Main roles: {roles_str}")
+
+    playstyle = profile.get("playstyle", [])
+    if playstyle:
+        parts.append(f"Playstyle: {', '.join(playstyle)}")
+
+    goals = profile.get("goals", [])
+    if goals:
+        parts.append(f"Goals: {', '.join(goals)}")
+
+    return "\n".join(parts)
 
 
 def sanitize_user(user):

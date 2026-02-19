@@ -32,8 +32,8 @@ export async function getCurrentUser() {
   return response.data;
 }
 
-export async function updateProfile(profile) {
-  const response = await api.put('/auth/profile', { profile });
+export async function updateProfile(profileData) {
+  const response = await api.put('/auth/profile', profileData);
   return response.data;
 }
 
@@ -70,6 +70,22 @@ export async function getChatSessions() {
 
 export async function getSessionHistory(sessionId) {
   const response = await api.get(`/chat/history/${sessionId}`);
+  return response.data;
+}
+
+// Dashboard
+export async function getDashboardGames() {
+  const response = await api.get('/dashboard/games');
+  return response.data;
+}
+
+export async function getDashboardGameDetail(gameName) {
+  const response = await api.get(`/dashboard/game/${encodeURIComponent(gameName)}`);
+  return response.data;
+}
+
+export async function getDashboardTip() {
+  const response = await api.get('/dashboard/tip');
   return response.data;
 }
 

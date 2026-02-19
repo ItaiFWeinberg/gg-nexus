@@ -108,12 +108,15 @@ def get_current_user(current_user):
 @auth_bp.route("/api/auth/profile", methods=["PUT"])
 @token_required
 def update_profile(current_user):
-    """Update the user's gaming profile (onboarding data)."""
+    """Update the user's gaming profile (onboarding & settings)."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
 
     from models.user import update_user_profile
 
-    update_user_profile(current_user["_id"], data)
-    return jsonify({"message": "Profile updated"})
+    profile_data = data.get("profile", data)
+    update_user_profile(current_user["_id"], profile_data)
+
+    updated_user = find_user_by_id(current_user["_id"])
+    return jsonify({"message": "Profile updated", "user": updated_user})
