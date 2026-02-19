@@ -1,44 +1,26 @@
-import { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import AuthContext from './AuthContext';
 import { login as apiLogin, signup as apiSignup, getCurrentUser, setToken, clearToken } from '../services/api';
 
-const AuthContext = createContext(null);
+const hasToken = !!sessionStorage.getItem('gg_nexus_token');
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-
-export function AuthProvider({ children }) {
-  // Initialize state from sessionStorage synchronously (not in useEffect)
-  // This avoids the setState-in-effect error
+export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
+  const [loading, setLoading] = useState(hasToken);
 
-  // Check for saved token on first render
-  // We use a Promise pattern instead of useEffect + setState
-  if (!initialized) {
-    setInitialized(true);
+  useEffect(() => {
     const savedToken = sessionStorage.getItem('gg_nexus_token');
-    if (savedToken) {
-      setToken(savedToken);
-      getCurrentUser()
-        .then(data => {
-          setUser(data.user);
-          setLoading(false);
-        })
-        .catch(() => {
-          sessionStorage.removeItem('gg_nexus_token');
-          clearToken();
-          setLoading(false);
-        });
-    } else {
-      setLoading(false);
-    }
-  }
+    if (!savedToken) return;
+
+    setToken(savedToken);
+    getCurrentUser()
+      .then(data => setUser(data.user))
+      .catch(() => {
+        sessionStorage.removeItem('gg_nexus_token');
+        clearToken();
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const login = useCallback(async (username, password) => {
     const data = await apiLogin(username, password);

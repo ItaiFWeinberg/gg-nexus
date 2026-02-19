@@ -43,7 +43,7 @@ export default function Landing() {
           <button onClick={() => navigate('/signup')}
             className="group relative px-10 py-4 bg-nox-red text-white font-gaming text-sm tracking-widest rounded-lg transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,45,85,0.5)] hover:scale-105 active:scale-95 overflow-hidden">
             <span className="relative z-10">ENTER THE NEXUS</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-nox-red-bright to-nox-red opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute inset-0 bg-linear-to-r from-nox-red-bright to-nox-red opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
           <button onClick={() => navigate('/login')}
             className="px-10 py-4 border border-nox-border text-nox-text font-gaming text-sm tracking-widest rounded-lg hover:border-nox-red/50 hover:text-white transition-all duration-300 hover:scale-105 active:scale-95">

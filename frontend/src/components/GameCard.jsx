@@ -15,7 +15,7 @@ export default function GameCard({ gameId, selected, onClick }) {
         boxShadow: selected ? `0 4px 24px ${game.accent}25, inset 0 0 0 1px ${game.accent}40` : `inset 0 0 0 1px rgba(255,255,255,0.05)`,
       }}
     >
-      <div className="absolute top-0 left-0 w-full h-[2px] transition-opacity"
+      <div className="absolute top-0 left-0 w-full h-0.5 transition-opacity"
         style={{ background: `linear-gradient(90deg, transparent, ${game.accent}, transparent)`, opacity: selected ? 1 : 0 }} />
 
       <div className="flex items-center gap-3 px-4 py-3.5">
