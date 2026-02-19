@@ -10,7 +10,6 @@ export default function Landing() {
     <div className="min-h-screen bg-nox-bg relative overflow-hidden">
       <ParticleBackground />
 
-      {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-8 py-5">
         <div className="flex items-center gap-3">
           <NoxusLogo size={36} />
@@ -26,66 +25,44 @@ export default function Landing() {
         </div>
       </nav>
 
-      {/* Hero */}
       <section className="relative z-10 flex flex-col items-center justify-center px-6 pt-12 pb-20 text-center">
         <div className="mb-6 animate-slide-up">
           <BotAvatar mood="happy" size={160} />
         </div>
-
         <h1 className="font-gaming text-5xl md:text-7xl font-black text-white mb-4 tracking-tight animate-slide-up stagger-1">
           GG <span className="text-nox-red neon-text">NEXUS</span>
         </h1>
-
         <p className="font-display text-2xl md:text-3xl text-nox-muted mb-3 font-light animate-slide-up stagger-2 tracking-wide">
           AI That Plays Like You Think
         </p>
-
         <p className="text-sm text-nox-subtle max-w-lg mb-10 animate-slide-up stagger-3 leading-relaxed">
           Meet your personal gaming companion. Nexus learns your games, remembers your playstyle,
           and gives advice that actually makes you better. Not generic tips — real, personalized coaching.
         </p>
-
         <div className="flex gap-4 animate-slide-up stagger-4">
-          <button
-            onClick={() => navigate('/signup')}
-            className="group relative px-10 py-4 bg-nox-red text-white font-gaming text-sm tracking-widest rounded-lg 
-                       transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,45,85,0.5)] hover:scale-105 active:scale-95 overflow-hidden"
-          >
+          <button onClick={() => navigate('/signup')}
+            className="group relative px-10 py-4 bg-nox-red text-white font-gaming text-sm tracking-widest rounded-lg transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,45,85,0.5)] hover:scale-105 active:scale-95 overflow-hidden">
             <span className="relative z-10">ENTER THE NEXUS</span>
             <div className="absolute inset-0 bg-gradient-to-r from-nox-red-bright to-nox-red opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
-          <button
-            onClick={() => navigate('/login')}
-            className="px-10 py-4 border border-nox-border text-nox-text font-gaming text-sm tracking-widest rounded-lg 
-                       hover:border-nox-red/50 hover:text-white transition-all duration-300 hover:scale-105 active:scale-95"
-          >
+          <button onClick={() => navigate('/login')}
+            className="px-10 py-4 border border-nox-border text-nox-text font-gaming text-sm tracking-widest rounded-lg hover:border-nox-red/50 hover:text-white transition-all duration-300 hover:scale-105 active:scale-95">
             SIGN IN
           </button>
         </div>
       </section>
 
-      {/* Features */}
       <section className="relative z-10 px-6 pb-20 max-w-5xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <FeatureCard
-            icon={<BotAvatar mood="thinking" size={50} />}
-            title="Thinks Before Speaking"
-            desc="Nexus reasons through your question, pulls relevant data, and gives answers that make sense for YOUR situation."
-          />
-          <FeatureCard
-            icon={<BotAvatar mood="happy" size={50} />}
-            title="Remembers Everything"
-            desc="Tell it your mains once. It remembers forever — your rank, your goals, your playstyle. Every chat makes it smarter."
-          />
-          <FeatureCard
-            icon={<BotAvatar mood="excited" size={50} />}
-            title="Reacts To You"
-            desc="Win streak? It celebrates. Tilted? It helps you recover. Nexus responds like a real gaming buddy, not a textbook."
-          />
+          <FeatureCard icon={<BotAvatar mood="thinking" size={50} />} title="Thinks Before Speaking"
+            desc="Nexus reasons through your question, pulls relevant data, and gives answers that make sense for YOUR situation." />
+          <FeatureCard icon={<BotAvatar mood="happy" size={50} />} title="Remembers Everything"
+            desc="Tell it your mains once. It remembers forever — your rank, your goals, your playstyle. Every chat makes it smarter." />
+          <FeatureCard icon={<BotAvatar mood="excited" size={50} />} title="Reacts To You"
+            desc="Win streak? It celebrates. Tilted? It helps you recover. Nexus responds like a real gaming buddy, not a textbook." />
         </div>
       </section>
 
-      {/* How it works */}
       <section className="relative z-10 px-6 pb-20 max-w-4xl mx-auto">
         <h2 className="font-gaming text-2xl text-white text-center mb-12 tracking-wider">
           HOW IT <span className="text-nox-red">WORKS</span>
@@ -97,7 +74,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Games */}
       <section className="relative z-10 px-6 pb-20 max-w-4xl mx-auto text-center">
         <h2 className="font-gaming text-2xl text-white mb-4 tracking-wider">
           YOUR <span className="text-nox-red">GAMES</span>
@@ -112,23 +88,18 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* CTA */}
       <section className="relative z-10 px-6 pb-16 text-center">
         <div className="glass rounded-2xl p-12 max-w-2xl mx-auto">
           <BotAvatar mood="excited" size={80} />
           <h2 className="font-gaming text-3xl text-white mt-6 mb-3 tracking-wider">READY?</h2>
           <p className="text-nox-muted text-sm mb-8">Free to use. Your AI companion is waiting.</p>
-          <button
-            onClick={() => navigate('/signup')}
-            className="px-12 py-4 bg-nox-red hover:bg-nox-red-bright text-white font-gaming text-sm tracking-widest rounded-lg 
-                       transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,45,85,0.5)] hover:scale-105"
-          >
+          <button onClick={() => navigate('/signup')}
+            className="px-12 py-4 bg-nox-red hover:bg-nox-red-bright text-white font-gaming text-sm tracking-widest rounded-lg transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,45,85,0.5)] hover:scale-105">
             CREATE YOUR ACCOUNT
           </button>
         </div>
       </section>
 
-      {/* Minimal footer — no tech stack */}
       <footer className="relative z-10 py-6 text-center border-t border-nox-border/30">
         <p className="text-xs text-nox-subtle/50">© 2026 GG Nexus</p>
       </footer>

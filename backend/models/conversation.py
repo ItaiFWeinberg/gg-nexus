@@ -1,6 +1,4 @@
-"""
-Conversation Model — Chat history + session summaries
-"""
+"""Conversation model — persists chat history and provides agent memory."""
 
 from datetime import datetime
 from bson import ObjectId
@@ -10,97 +8,76 @@ conversations_collection = db.conversations
 
 
 def save_message(user_id, role, content, session_id=None):
+    """Save a message to conversation history."""
     message = {
         "user_id": user_id,
         "session_id": session_id or str(ObjectId()),
         "role": role,
         "content": content,
-        "timestamp": datetime.utcnow()
+        "timestamp": datetime.utcnow(),
     }
     conversations_collection.insert_one(message)
     return message
 
 
 def get_conversation_history(user_id, session_id=None, limit=20):
+    """Retrieve recent messages formatted for the Gemini API."""
     query = {"user_id": user_id}
     if session_id:
         query["session_id"] = session_id
 
     messages = list(
-        conversations_collection.find(query)
-        .sort("timestamp", -1)
-        .limit(limit)
+        conversations_collection.find(query).sort("timestamp", -1).limit(limit)
     )
     messages.reverse()
 
-    formatted = []
-    for msg in messages:
-        formatted.append({
+    return [
+        {
             "role": msg["role"] if msg["role"] == "user" else "model",
-            "parts": [{"text": msg["content"]}]
-        })
-    return formatted
-
-
-def get_user_sessions(user_id, limit=20):
-    """Get all sessions with preview and metadata."""
-    pipeline = [
-        {"$match": {"user_id": user_id}},
-        {"$group": {
-            "_id": "$session_id",
-            "first_user_msg": {"$first": {
-                "$cond": [{"$eq": ["$role", "user"]}, "$content", None]
-            }},
-            "last_message": {"$last": "$content"},
-            "last_role": {"$last": "$role"},
-            "first_time": {"$min": "$timestamp"},
-            "last_time": {"$max": "$timestamp"},
-            "message_count": {"$sum": 1},
-            "all_user_msgs": {
-                "$push": {
-                    "$cond": [{"$eq": ["$role", "user"]}, "$content", "$$REMOVE"]
-                }
-            }
-        }},
-        {"$sort": {"last_time": -1}},
-        {"$limit": limit}
+            "parts": [{"text": msg["content"]}],
+        }
+        for msg in messages
     ]
 
-    sessions = list(conversations_collection.aggregate(pipeline))
-    result = []
-    for s in sessions:
-        # Build a summary from user messages
-        user_msgs = [m for m in s.get("all_user_msgs", []) if m]
-        if user_msgs:
-            # Use first user message as title, combine others for summary
-            title = user_msgs[0][:80]
-            topics = list(set([m[:50] for m in user_msgs[:5]]))
-            summary = " | ".join(topics)
-        else:
-            title = "New conversation"
-            summary = ""
 
-        result.append({
+def get_user_sessions(user_id, limit=10):
+    """List recent chat sessions with previews (episodic memory)."""
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {
+            "$group": {
+                "_id": "$session_id",
+                "last_message": {"$last": "$content"},
+                "last_time": {"$max": "$timestamp"},
+                "message_count": {"$sum": 1},
+            }
+        },
+        {"$sort": {"last_time": -1}},
+        {"$limit": limit},
+    ]
+
+    return [
+        {
             "session_id": s["_id"],
-            "title": title,
-            "summary": summary[:200],
-            "preview": s["last_message"][:100] if s["last_message"] else "",
-            "first_time": s["first_time"].isoformat() if s["first_time"] else None,
-            "last_time": s["last_time"].isoformat() if s["last_time"] else None,
-            "message_count": s["message_count"]
-        })
-    return result
+            "preview": s["last_message"][:100]
+            + ("..." if len(s["last_message"]) > 100 else ""),
+            "last_time": s["last_time"].isoformat(),
+            "message_count": s["message_count"],
+        }
+        for s in conversations_collection.aggregate(pipeline)
+    ]
 
 
 def get_user_context_summary(user_id, limit=5):
+    """Summarize recent user messages for agent context injection."""
     recent = list(
-        conversations_collection.find(
-            {"user_id": user_id, "role": "user"}
-        ).sort("timestamp", -1).limit(limit)
+        conversations_collection.find({"user_id": user_id, "role": "user"})
+        .sort("timestamp", -1)
+        .limit(limit)
     )
 
     if not recent:
-        return ""
+        return "This is a new user with no conversation history."
 
-    summaries = [msg["content"][:100] for msg in recent]
-    return "Recent user topics: " + " | ".join(summaries)
+    summaries = [msg["content"][:150] for msg in recent]
+    return "Recent topics the user discussed: " + " | ".join(summaries)

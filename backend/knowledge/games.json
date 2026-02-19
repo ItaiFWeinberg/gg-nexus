@@ -1,0 +1,224 @@
+{
+  "league_of_legends": {
+    "name": "League of Legends",
+    "developer": "Riot Games",
+    "genre": ["MOBA"],
+    "platforms": ["PC"],
+    "player_count": "5v5",
+    "description": "Team-based strategy game where two teams of five champions compete to destroy the enemy Nexus. Features over 160 champions across roles.",
+    "similar_games": ["Dota 2", "Heroes of the Storm", "Smite"],
+    "difficulty": "High",
+    "time_commitment": "30-45 min per game",
+    "free_to_play": true,
+    "competitive_scene": "LCS, LEC, LCK, LPL — one of the biggest esports globally",
+    "current_meta": {
+      "patch": "14.24",
+      "top_tier_champions": {
+        "top": ["Ambessa", "Ksante", "Jax", "Gwen", "Camille"],
+        "jungle": ["Viego", "Lee Sin", "Rek'Sai", "Elise", "Graves"],
+        "mid": ["Aurora", "Ahri", "Syndra", "Orianna", "Yone"],
+        "adc": ["Jinx", "Kai'Sa", "Jhin", "Ashe", "Caitlyn"],
+        "support": ["Thresh", "Nautilus", "Lulu", "Janna", "Pyke"]
+      },
+      "meta_summary": "Tank-heavy top lane meta. Jungle favors early aggression. Mid is mage-focused with Aurora S-tier. ADC is hypercarry-friendly.",
+      "tips": [
+        "Aim for 8+ CS per minute as a laner",
+        "Ward the river at 3:15 for first jungle gank timing",
+        "Prioritize dragon control after first tower",
+        "Split pushing is more effective than teamfighting in low elo",
+        "Master 2-3 champions deeply rather than 20 at a surface level"
+      ]
+    },
+    "beginner_tips": [
+      "Start with simple champions: Garen (top), Master Yi (jungle), Annie (mid)",
+      "Focus on last-hitting minions — this is the #1 skill gap in low elo",
+      "Always buy Control Wards on every back",
+      "Watch the minimap every 5 seconds",
+      "Mute toxic players immediately"
+    ]
+  },
+  "valorant": {
+    "name": "Valorant",
+    "developer": "Riot Games",
+    "genre": ["Tactical FPS"],
+    "platforms": ["PC"],
+    "player_count": "5v5",
+    "description": "Character-based tactical shooter combining precise gunplay with unique agent abilities. Teams alternate attacking and defending.",
+    "similar_games": ["CS2", "Overwatch 2", "Rainbow Six Siege"],
+    "difficulty": "High",
+    "time_commitment": "30-40 min per game",
+    "free_to_play": true,
+    "competitive_scene": "VCT — Valorant Champions Tour",
+    "current_meta": {
+      "patch": "9.12",
+      "top_tier_agents": {
+        "duelist": ["Jett", "Raze", "Reyna", "Neon"],
+        "initiator": ["Sova", "Fade", "KAY/O", "Gekko"],
+        "controller": ["Omen", "Astra", "Viper", "Clove"],
+        "sentinel": ["Cypher", "Killjoy", "Deadlock", "Sage"]
+      },
+      "meta_summary": "Double controller meta. Cypher dominant after buffs. Jett top duelist. Viper must-pick on Breeze and Icebox.",
+      "best_weapons": ["Vandal", "Phantom", "Operator", "Spectre", "Ghost"],
+      "tips": [
+        "Crosshair placement at head level is king",
+        "Don't run and shoot — counter-strafing is essential",
+        "Learn 2-3 agents per role for flexibility",
+        "Use utility BEFORE peeking, not after",
+        "Full save after pistol loss, force on round 3 if you won pistol"
+      ]
+    },
+    "beginner_tips": [
+      "Start with Sage or Reyna — simple abilities, self-sustain",
+      "Practice in the Range for 10 min daily",
+      "Learn callouts for your 2 most-played maps",
+      "Don't crouch spray — makes your head easier to hit",
+      "Communicate with your team — even basic info wins rounds"
+    ]
+  },
+  "minecraft": {
+    "name": "Minecraft",
+    "developer": "Mojang Studios",
+    "genre": ["Sandbox", "Survival", "Creative"],
+    "platforms": ["PC", "Console", "Mobile"],
+    "player_count": "1-Unlimited (servers)",
+    "description": "Open-world sandbox game where players mine resources, craft items, and build in a procedurally generated 3D block world.",
+    "similar_games": ["Terraria", "Valheim", "Lego Fortnite"],
+    "difficulty": "Low-Medium",
+    "time_commitment": "Flexible",
+    "free_to_play": false,
+    "current_meta": {
+      "version": "1.21",
+      "meta_summary": "1.21 added Trial Chambers and the Mace weapon. Survival meta focuses on efficient farms and elytra travel.",
+      "tips": [
+        "Build an iron farm early for infinite tools and armor",
+        "Always carry a water bucket — MLG water saves lives",
+        "Villager trading halls are extremely powerful in survival",
+        "Use beds to skip night rather than fighting mobs early",
+        "Strip mining at Y=-59 is most efficient for diamonds"
+      ]
+    },
+    "beginner_tips": [
+      "First day: punch trees → workbench → wooden pickaxe → mine stone → shelter before night",
+      "Don't dig straight down — you'll fall into lava",
+      "Torches prevent mob spawning — light up your base",
+      "Craft a bed ASAP with 3 wool and 3 planks",
+      "Find a village for easy food and trading"
+    ]
+  },
+  "fortnite": {
+    "name": "Fortnite",
+    "developer": "Epic Games",
+    "genre": ["Battle Royale", "Shooter"],
+    "platforms": ["PC", "Console", "Mobile"],
+    "player_count": "100 players",
+    "description": "Battle royale where 100 players fight to be last standing, featuring building mechanics and frequent crossover events.",
+    "similar_games": ["Apex Legends", "PUBG", "Warzone"],
+    "difficulty": "Medium",
+    "time_commitment": "20-25 min per game",
+    "free_to_play": true,
+    "competitive_scene": "FNCS — Fortnite Champion Series",
+    "current_meta": {
+      "chapter": "Chapter 6 Season 1",
+      "meta_summary": "Building is back as core mechanic. Shotgun meta with Pump dominant. Late game is about height advantage.",
+      "tips": [
+        "Learn basic 90s and ramp rushes — building wins fights",
+        "Always carry shotgun + AR + heals",
+        "Land at named POIs for better loot",
+        "Use audio cues — footsteps tell you everything",
+        "Rotate early to avoid storm"
+      ]
+    }
+  },
+  "cs2": {
+    "name": "Counter-Strike 2",
+    "developer": "Valve",
+    "genre": ["Tactical FPS"],
+    "platforms": ["PC"],
+    "player_count": "5v5",
+    "description": "The definitive competitive tactical shooter with round-based matches, an economy system, and precise gunplay.",
+    "similar_games": ["Valorant", "Rainbow Six Siege"],
+    "difficulty": "Very High",
+    "time_commitment": "35-45 min per game",
+    "free_to_play": true,
+    "competitive_scene": "Majors, ESL Pro League, BLAST",
+    "current_meta": {
+      "meta_summary": "AK-47 and M4A1-S dominant. Utility more important than ever with volumetric smoke changes.",
+      "top_weapons": ["AK-47", "M4A1-S", "AWP", "Desert Eagle", "USP-S"],
+      "tips": [
+        "Learn AK spray pattern — first 10 bullets should be muscle memory",
+        "Utility wins rounds more than aim — learn 3 smokes per map",
+        "Play for crossfires — avoid fair 1v1s",
+        "Economy is a team decision — buy and save together",
+        "Watch pro demos for positioning and rotations"
+      ]
+    }
+  },
+  "apex_legends": {
+    "name": "Apex Legends",
+    "developer": "Respawn Entertainment",
+    "genre": ["Battle Royale", "FPS"],
+    "platforms": ["PC", "Console"],
+    "player_count": "60 (Trios/Duos)",
+    "description": "Fast-paced battle royale with unique character abilities and advanced movement mechanics.",
+    "similar_games": ["Fortnite", "Warzone", "PUBG"],
+    "difficulty": "Medium-High",
+    "time_commitment": "15-20 min per game",
+    "free_to_play": true,
+    "competitive_scene": "ALGS — Apex Legends Global Series",
+    "current_meta": {
+      "meta_summary": "Movement legends remain popular. Wingman and R-301 are top weapons. Aggressive play rewarded.",
+      "tips": [
+        "Master sliding and bunny hopping — movement is everything",
+        "Armor swapping mid-fight is essential",
+        "Always carry a Wingman or Peacekeeper for close range",
+        "Rotate early using balloons and jump towers",
+        "Ping system eliminates the need for voice comms"
+      ]
+    }
+  },
+  "tft": {
+    "name": "Teamfight Tactics",
+    "developer": "Riot Games",
+    "genre": ["Auto Battler", "Strategy"],
+    "platforms": ["PC", "Mobile"],
+    "player_count": "8 players FFA",
+    "description": "Auto battler where players draft champions, build team compositions with synergies, and manage economy.",
+    "similar_games": ["Dota Underlords", "Hearthstone Battlegrounds"],
+    "difficulty": "Medium",
+    "time_commitment": "25-35 min per game",
+    "free_to_play": true,
+    "current_meta": {
+      "set": "Set 13 — Into the Arcane",
+      "meta_summary": "Reroll comps strong early game. Level 8 fast is standard for high-cost carries. Econ augments are flexible.",
+      "tips": [
+        "Don't roll before level 7 unless playing a reroll comp",
+        "Econ to 50 gold and stay there — interest is king",
+        "Scout other boards to avoid contested comps",
+        "Position carry in back corner with frontline",
+        "Augment selection should match current items, not dream comp"
+      ]
+    }
+  },
+  "deadlock": {
+    "name": "Deadlock",
+    "developer": "Valve",
+    "genre": ["MOBA", "Third-Person Shooter"],
+    "platforms": ["PC"],
+    "player_count": "6v6",
+    "description": "Valve's hybrid MOBA-shooter with heroes, lane mechanics, soul farming, and base destruction.",
+    "similar_games": ["League of Legends", "Overwatch 2", "Smite"],
+    "difficulty": "High",
+    "time_commitment": "25-40 min per game",
+    "free_to_play": true,
+    "current_meta": {
+      "meta_summary": "Early access. Rewards hybrid aim + ability usage. Farming souls efficiently is critical. Items have massive impact.",
+      "tips": [
+        "Focus on soul farming in lane — denying enemy souls is huge",
+        "Buy items that complement your hero's kit",
+        "Learn to use vertical space with ziplines",
+        "Objectives are more important than kills",
+        "This is a MOBA first, shooter second — macro wins games"
+      ]
+    }
+  }
+}

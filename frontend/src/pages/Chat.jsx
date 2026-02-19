@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { RiSendPlaneFill, RiAddLine, RiHistoryLine, RiCloseLine, RiChat3Line } from 'react-icons/ri';
 import { sendMessage, newSession, getSessionId, setSessionId, getSessionHistory, getChatSessions } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -6,7 +6,6 @@ import BotAvatar from '../components/BotAvatar';
 
 const VALID_MOODS = ['happy', 'empathy', 'excited', 'thinking', 'curious', 'proud', 'frustrated', 'idle', 'playful', 'intense', 'supportive', 'impressed'];
 
-// Fallback mood detection if AI doesn't send a tag
 function detectMood(message) {
   const lower = message.toLowerCase();
   if (/lost|lose|losing|tilted|frustrated|stuck|bad|hate|suck|died|feed|angry|sad|depressed|hopeless|trash|garbage|horrible|worst|demoted|deranked/.test(lower)) return 'empathy';
@@ -18,14 +17,10 @@ function detectMood(message) {
   return 'idle';
 }
 
-// Parse [MOOD:xxx] tag from AI response, return { mood, text }
 function parseMoodTag(response) {
   const match = response.match(/^\[MOOD:(\w+)\]\s*/i);
   if (match && VALID_MOODS.includes(match[1].toLowerCase())) {
-    return {
-      mood: match[1].toLowerCase(),
-      text: response.replace(match[0], '').trim()
-    };
+    return { mood: match[1].toLowerCase(), text: response.replace(match[0], '').trim() };
   }
   return { mood: null, text: response };
 }
@@ -59,6 +54,15 @@ export default function Chat() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
+  const showWelcome = useCallback(() => {
+    const name = user?.username || 'Player';
+    setMessages([{
+      role: 'assistant',
+      content: `What's good, ${name}. I'm Nexus — your gaming companion. What can I help you with?`
+    }]);
+    setBotMood('happy');
+  }, [user]);
+
   useEffect(() => {
     const loadHistory = async () => {
       try {
@@ -78,16 +82,7 @@ export default function Chat() {
       }
     };
     loadHistory();
-  }, [user, currentSessionId]);
-
-  const showWelcome = () => {
-    const name = user?.username || 'Player';
-    setMessages([{
-      role: 'assistant',
-      content: `What's good, ${name}. I'm Nexus — your gaming companion. What can I help you with?`
-    }]);
-    setBotMood('happy');
-  };
+  }, [user, currentSessionId, showWelcome]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -119,7 +114,7 @@ export default function Chat() {
       }
       setShowHistory(false);
     } catch {
-      // ignore
+      /* session load failed silently */
     }
   };
 
@@ -156,7 +151,7 @@ export default function Chat() {
       setMessages(prev => [...prev, { role: 'assistant', content: finalText }]);
     } catch (err) {
       setBotMood('empathy');
-      const errMsg = err.response?.data?.error || "Something went wrong. Make sure the backend is running.";
+      const errMsg = err.response?.data?.error || 'Something went wrong. Make sure the backend is running.';
       setMessages(prev => [...prev, { role: 'assistant', content: errMsg }]);
     } finally {
       setIsLoading(false);
@@ -220,7 +215,6 @@ export default function Chat() {
 
       {/* Main area */}
       <div className="flex-1 flex overflow-hidden">
-
         {/* History sidebar */}
         {showHistory && (
           <div className="w-72 border-r border-nox-border bg-nox-dark/50 flex flex-col shrink-0 animate-slide-up">
@@ -259,7 +253,7 @@ export default function Chat() {
 
         {/* Chat area */}
         <div className="flex-1 flex">
-          {/* Bot column */}
+          {/* Bot column — desktop only */}
           <div className="hidden lg:flex w-44 flex-col items-center pt-8 shrink-0 border-r border-nox-border/30">
             <div className="sticky top-8">
               <BotAvatar mood={botMood} size={110} />
@@ -268,7 +262,7 @@ export default function Chat() {
             </div>
           </div>
 
-          {/* Messages */}
+          {/* Messages column */}
           <div className="flex-1 flex flex-col">
             <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-4">
               {messages.length <= 1 && (
@@ -288,10 +282,11 @@ export default function Chat() {
                     )}
                     <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                       msg.role === 'user'
-                        ? 'bg-gradient-to-br from-nox-red to-nox-red-dim text-white rounded-br-sm'
+                        ? 'bg-linear-to-br from-nox-red to-nox-red-dim text-white rounded-br-sm'
                         : 'glass text-nox-text rounded-bl-sm'
                     }`}>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{stripMoodTags(msg.content)}</p>                    </div>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{stripMoodTags(msg.content)}</p>
+                    </div>
                     {msg.role === 'user' && (
                       <div className="w-7 h-7 rounded-lg bg-nox-hover border border-nox-border flex items-center justify-center shrink-0 mt-1">
                         <span className="text-nox-muted text-[10px] font-gaming">{user?.username?.charAt(0).toUpperCase() || 'P'}</span>
@@ -322,7 +317,7 @@ export default function Chat() {
             {messages.length <= 1 && (
               <div className="px-4 pb-2 shrink-0">
                 <div className="max-w-2xl mx-auto flex flex-wrap gap-2 justify-center">
-                  {["Recommend me a new game 🎮", "Help me improve at Valorant 🎯", "What's the current LoL meta? ⚔️", "I just lost 5 ranked games 😤"].map((s) => (
+                  {['Recommend me a new game 🎮', 'Help me improve at Valorant 🎯', "What's the current LoL meta? ⚔️", 'I just lost 5 ranked games 😤'].map((s) => (
                     <button key={s} onClick={() => { setInput(s); inputRef.current?.focus(); }}
                       className="px-3 py-2 text-xs glass rounded-lg text-nox-muted hover:text-nox-red hover:border-nox-red/30 transition-all">
                       {s}

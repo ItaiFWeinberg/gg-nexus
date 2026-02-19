@@ -1,5 +1,3 @@
-// Generate particles OUTSIDE the component (runs once on module load)
-// This avoids the "impure function during render" error
 function generateParticles() {
   return Array.from({ length: 30 }, (_, i) => ({
     id: i,
@@ -17,9 +15,7 @@ export default function ParticleBackground() {
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
       {PARTICLES.map((p) => (
-        <div
-          key={p.id}
-          className="absolute rounded-full bg-nox-red"
+        <div key={p.id} className="absolute rounded-full bg-nox-red"
           style={{
             left: `${p.left}%`,
             bottom: '-5%',
@@ -27,8 +23,7 @@ export default function ParticleBackground() {
             height: `${p.size}px`,
             opacity: p.opacity,
             animation: `particle-float ${p.duration}s linear ${p.delay}s infinite`,
-          }}
-        />
+          }} />
       ))}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-nox-red/5 rounded-full blur-3xl" />
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-nox-red/3 rounded-full blur-3xl" />

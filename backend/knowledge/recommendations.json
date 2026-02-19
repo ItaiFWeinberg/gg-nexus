@@ -1,0 +1,49 @@
+{
+  "by_genre": {
+    "moba": ["League of Legends", "Dota 2", "Smite", "Heroes of the Storm", "Deadlock"],
+    "fps": ["Valorant", "CS2", "Overwatch 2", "Rainbow Six Siege", "Apex Legends"],
+    "battle_royale": ["Fortnite", "Apex Legends", "PUBG", "Warzone", "Naraka Bladepoint"],
+    "sandbox": ["Minecraft", "Terraria", "Valheim", "No Man's Sky", "Rust"],
+    "rpg": ["Elden Ring", "Baldur's Gate 3", "Diablo IV", "Path of Exile 2", "Final Fantasy XIV"],
+    "strategy": ["Teamfight Tactics", "Civilization VI", "Age of Empires IV", "Stellaris", "XCOM 2"],
+    "fighting": ["Street Fighter 6", "Tekken 8", "Mortal Kombat 1", "Guilty Gear Strive", "MultiVersus"],
+    "racing": ["Forza Horizon 5", "Gran Turismo 7", "Mario Kart 8", "F1 24", "Need for Speed Unbound"],
+    "survival": ["Rust", "DayZ", "The Forest", "Subnautica", "Palworld"]
+  },
+  "by_playstyle": {
+    "competitive": ["Valorant", "CS2", "League of Legends", "Rocket League", "Street Fighter 6"],
+    "casual": ["Minecraft", "Stardew Valley", "Animal Crossing", "Fall Guys", "Among Us"],
+    "solo": ["Elden Ring", "Baldur's Gate 3", "Hades II", "Hollow Knight", "Celeste"],
+    "social": ["Fortnite", "Among Us", "Minecraft", "It Takes Two", "Phasmophobia"],
+    "creative": ["Minecraft", "Roblox", "Dreams", "Mario Maker 2", "Fortnite Creative"],
+    "grind": ["Path of Exile 2", "Diablo IV", "Warframe", "Destiny 2", "Final Fantasy XIV"]
+  },
+  "by_platform": {
+    "pc_exclusive": ["CS2", "Valorant", "League of Legends", "Deadlock", "Path of Exile 2"],
+    "cross_platform": ["Fortnite", "Minecraft", "Apex Legends", "Rocket League", "Genshin Impact"],
+    "console_focused": ["God of War Ragnarok", "Spider-Man 2", "Zelda: Tears of the Kingdom", "Mario Kart 8"],
+    "mobile_friendly": ["Genshin Impact", "TFT", "Brawl Stars", "Clash Royale", "Wild Rift"]
+  },
+  "transitions": {
+    "league_of_legends": {
+      "similar_mechanics": ["Dota 2", "Smite", "Deadlock"],
+      "same_universe": ["Valorant", "TFT", "Legends of Runeterra"],
+      "different_genre_same_feel": ["Baldur's Gate 3", "XCOM 2"]
+    },
+    "valorant": {
+      "similar_mechanics": ["CS2", "Rainbow Six Siege"],
+      "same_universe": ["League of Legends", "TFT"],
+      "different_genre_same_feel": ["Overwatch 2", "Apex Legends"]
+    },
+    "minecraft": {
+      "similar_mechanics": ["Terraria", "Valheim", "Lego Fortnite"],
+      "more_challenging": ["Rust", "Ark: Survival Evolved"],
+      "more_relaxing": ["Stardew Valley", "Animal Crossing"]
+    },
+    "fortnite": {
+      "similar_mechanics": ["Apex Legends", "Warzone", "PUBG"],
+      "more_competitive": ["Valorant", "CS2"],
+      "more_casual": ["Fall Guys", "Rocket League"]
+    }
+  }
+}

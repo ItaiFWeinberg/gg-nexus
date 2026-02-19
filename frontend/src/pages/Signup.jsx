@@ -5,7 +5,8 @@ import { updateProfile } from '../services/api';
 import NoxusLogo from '../components/NoxusLogo';
 import BotAvatar from '../components/BotAvatar';
 import ParticleBackground from '../components/ParticleBackground';
-import GameCard, { getGameData, getGameName } from '../components/GameCard';
+import GameCard from '../components/GameCard';
+import { getGameData, getGameName } from '../components/gameData';
 import { RiEyeLine, RiEyeOffLine, RiAddLine, RiCloseLine } from 'react-icons/ri';
 
 const GAMES_LIST = getGameData();
@@ -95,14 +96,13 @@ export default function Signup() {
   };
 
   const botMood = step === 1 ? 'idle' : step === 2 ? 'excited' : 'happy';
-  const botSpeech = step === 1 ? "Let's get you set up." : step === 2 ? "Pick everything you play!" : "Last step — how do you play?";
+  const botSpeech = step === 1 ? "Let's get you set up." : step === 2 ? 'Pick everything you play!' : 'Last step — how do you play?';
 
   return (
     <div className="min-h-screen bg-nox-bg relative overflow-hidden">
       <ParticleBackground />
 
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-6">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <Link to="/landing"><NoxusLogo size={36} /></Link>
           <BotAvatar mood={botMood} size={50} />
@@ -111,7 +111,7 @@ export default function Signup() {
           </div>
         </div>
 
-        {/* Steps */}
+        {/* Step indicator */}
         <div className="flex items-center gap-1 mb-6">
           {[
             { n: 1, label: 'Account' },
@@ -191,7 +191,7 @@ export default function Signup() {
           </div>
         )}
 
-        {/* Step 2: Games — FULL WIDTH */}
+        {/* Step 2: Games */}
         {step === 2 && (
           <div className="w-full max-w-3xl animate-slide-up">
             <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">YOUR GAMES</h1>
@@ -199,27 +199,20 @@ export default function Signup() {
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
               {GAMES_LIST.map((game) => (
-                <GameCard
-                  key={game.id}
-                  gameId={game.id}
+                <GameCard key={game.id} gameId={game.id}
                   selected={selectedGames.includes(game.id)}
-                  onClick={() => toggleGame(game.id)}
-                />
+                  onClick={() => toggleGame(game.id)} />
               ))}
             </div>
 
-            {/* Custom games */}
             <div className="glass rounded-xl p-4 mb-4">
               <p className="text-xs text-nox-muted uppercase tracking-widest mb-3">Don't see your game? Add it:</p>
               <div className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  value={customGameInput}
+                <input type="text" value={customGameInput}
                   onChange={(e) => setCustomGameInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addCustomGame()}
                   placeholder="Type a game name..."
-                  className="flex-1 bg-nox-bg border border-nox-border rounded-lg px-3 py-2 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors"
-                />
+                  className="flex-1 bg-nox-bg border border-nox-border rounded-lg px-3 py-2 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 transition-colors" />
                 <button onClick={addCustomGame} disabled={!customGameInput.trim()}
                   className="px-4 py-2 bg-nox-red/20 border border-nox-red/30 text-nox-red rounded-lg hover:bg-nox-red/30 disabled:opacity-30 transition-all">
                   <RiAddLine />
@@ -254,7 +247,7 @@ export default function Signup() {
           </div>
         )}
 
-        {/* Step 3: Style — WIDER */}
+        {/* Step 3: Playstyle & Goals */}
         {step === 3 && (
           <div className="w-full max-w-2xl animate-slide-up">
             <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">YOUR STYLE</h1>

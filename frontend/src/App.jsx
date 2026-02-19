@@ -1,22 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { useAuth } from './context/AuthContext';
+import AuthProvider from './context/AuthProvider';
 import Sidebar from './components/Sidebar';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
-
-/**
- * App — Root component with authentication routing
- * 
- * ROUTING LOGIC:
- * - Not logged in → Landing, Login, Signup pages (no sidebar)
- * - Logged in → Dashboard, Chat, etc. (with sidebar)
- * - Trying to access /chat without auth → redirect to /login
- * 
- * AuthProvider wraps everything so ALL components can access useAuth()
- */
 
 function App() {
   return (
@@ -31,7 +21,6 @@ function App() {
 function AppRoutes() {
   const { user, loading } = useAuth();
 
-  // Show nothing while checking auth status (prevents flash of wrong page)
   if (loading) {
     return (
       <div className="min-h-screen bg-nox-bg flex items-center justify-center">
@@ -42,12 +31,9 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* PUBLIC ROUTES — no auth required, no sidebar */}
       <Route path="/landing" element={!user ? <Landing /> : <Navigate to="/chat" />} />
       <Route path="/login" element={!user ? <Login /> : <Navigate to="/chat" />} />
       <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/chat" />} />
-
-      {/* PROTECTED ROUTES — auth required, with sidebar */}
       <Route path="/*" element={user ? <ProtectedLayout /> : <Navigate to="/landing" />} />
     </Routes>
   );

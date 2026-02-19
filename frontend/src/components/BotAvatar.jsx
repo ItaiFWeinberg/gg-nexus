@@ -1,29 +1,26 @@
 /**
- * BotAvatar — Nexus Spirit: Fantasy warrior entity
- * 
- * Moods: idle, thinking, happy, empathy, excited, curious, proud, frustrated
- * Each mood changes: eye shape, glow, mouth, particle intensity
+ * BotAvatar — Nexus Spirit: Animated fantasy warrior entity
+ * 12 moods: idle, thinking, happy, empathy, excited, curious, proud, frustrated, playful, intense, supportive, impressed
  */
 
 export default function BotAvatar({ mood = 'idle', size = 120 }) {
- const config = {
-    idle:       { glow: 0.25, eyeColor: '#ff2d55', pupil: true,  mouthType: 'none',    anim: 'animate-float' },
-    thinking:   { glow: 0.45, eyeColor: '#ff6b8a', pupil: false, mouthType: 'dots',    anim: 'animate-pulse' },
-    happy:      { glow: 0.55, eyeColor: '#ff4d6d', pupil: false, mouthType: 'smile',   anim: 'animate-float' },
-    empathy:    { glow: 0.2,  eyeColor: '#ff8fa3', pupil: true,  mouthType: 'flat',    anim: 'animate-float' },
-    excited:    { glow: 0.7,  eyeColor: '#ff1a44', pupil: true,  mouthType: 'open',    anim: '' },
-    curious:    { glow: 0.35, eyeColor: '#ff5577', pupil: true,  mouthType: 'none',    anim: 'animate-float' },
-    proud:      { glow: 0.6,  eyeColor: '#ff2d55', pupil: false, mouthType: 'smile',   anim: 'animate-float' },
-    frustrated: { glow: 0.3,  eyeColor: '#cc2244', pupil: true,  mouthType: 'zigzag',  anim: '' },
-    playful:    { glow: 0.5,  eyeColor: '#ff6b8a', pupil: true,  mouthType: 'smile',   anim: 'animate-float' },
-    intense:    { glow: 0.65, eyeColor: '#ff0033', pupil: true,  mouthType: 'flat',    anim: '' },
-    supportive: { glow: 0.4,  eyeColor: '#ff6b8a', pupil: false, mouthType: 'smile',   anim: 'animate-float' },
-    impressed:  { glow: 0.7,  eyeColor: '#ff2d55', pupil: true,  mouthType: 'open',    anim: '' },
+  const config = {
+    idle:       { glow: 0.25, eyeColor: '#ff2d55', pupil: true,  mouthType: 'none',   anim: 'animate-float' },
+    thinking:   { glow: 0.45, eyeColor: '#ff6b8a', pupil: false, mouthType: 'dots',   anim: 'animate-pulse' },
+    happy:      { glow: 0.55, eyeColor: '#ff4d6d', pupil: false, mouthType: 'smile',  anim: 'animate-float' },
+    empathy:    { glow: 0.2,  eyeColor: '#ff8fa3', pupil: true,  mouthType: 'flat',   anim: 'animate-float' },
+    excited:    { glow: 0.7,  eyeColor: '#ff1a44', pupil: true,  mouthType: 'open',   anim: '' },
+    curious:    { glow: 0.35, eyeColor: '#ff5577', pupil: true,  mouthType: 'none',   anim: 'animate-float' },
+    proud:      { glow: 0.6,  eyeColor: '#ff2d55', pupil: false, mouthType: 'smile',  anim: 'animate-float' },
+    frustrated: { glow: 0.3,  eyeColor: '#cc2244', pupil: true,  mouthType: 'zigzag', anim: '' },
+    playful:    { glow: 0.5,  eyeColor: '#ff6b8a', pupil: true,  mouthType: 'smile',  anim: 'animate-float' },
+    intense:    { glow: 0.65, eyeColor: '#ff0033', pupil: true,  mouthType: 'flat',   anim: '' },
+    supportive: { glow: 0.4,  eyeColor: '#ff6b8a', pupil: false, mouthType: 'smile',  anim: 'animate-float' },
+    impressed:  { glow: 0.7,  eyeColor: '#ff2d55', pupil: true,  mouthType: 'open',   anim: '' },
   };
 
   const c = config[mood] || config.idle;
 
-  // Eye geometry per mood
   const eyeShape = {
     idle:       { ry: 3.5, rx: 4 },
     thinking:   { ry: 3, rx: 5 },
@@ -41,7 +38,7 @@ export default function BotAvatar({ mood = 'idle', size = 120 }) {
 
   const eye = eyeShape[mood] || eyeShape.idle;
   const isArcEye = mood === 'happy' || mood === 'proud' || mood === 'playful' || mood === 'supportive';
-  
+
   return (
     <div className={`relative ${c.anim}`} style={{ width: size, height: size }}>
       <div className="absolute inset-0 rounded-full blur-xl transition-all duration-700"
@@ -59,7 +56,7 @@ export default function BotAvatar({ mood = 'idle', size = 120 }) {
           </linearGradient>
         </defs>
 
-        {/* Energy particles — intensity based on mood */}
+        {/* Energy particles */}
         {[
           { cx: 18, cy: 45, r: 1, dur: '4s' },
           { cx: 82, cy: 40, r: 0.8, dur: '3.5s' },

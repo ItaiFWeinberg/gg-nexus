@@ -1,3 +1,13 @@
+"""
+Dynamic data fetcher — pulls live game data from multiple sources.
+
+Source priority chain:
+  1. MongoDB cache (if fresh, < 24h)
+  2. Official APIs (Riot Games for LoL/Valorant)
+  3. Gemini AI search (universal fallback — works for any game)
+  4. Static knowledge base (last resort)
+"""
+
 import json
 import os
 import requests
@@ -8,46 +18,47 @@ from models.cache import get_cached, set_cached
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# Riot API key (optional — works without it using Gemini fallback)
 RIOT_API_KEY = os.getenv("RIOT_API_KEY", "")
-
-# Static fallback
 KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowledge"
 
 
 def _load_static_fallback(game_key):
+    """Load from static JSON as last resort."""
     filepath = KNOWLEDGE_DIR / "games.json"
     if filepath.exists():
         with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get(game_key)
+            return json.load(f).get(game_key)
     return None
 
 
-# === RIOT API INTEGRATION ===
+# ── Riot Games API ──────────────────────────────────────────────
+
 
 def fetch_riot_lol_data():
-    """Fetch live League of Legends data from Riot API."""
+    """Fetch live League of Legends data (patch version, free rotation)."""
     if not RIOT_API_KEY:
         return None
 
     try:
-        # Get current patch version
-        version_url = "https://ddragon.leagueoflegends.com/api/versions.json"
-        versions = requests.get(version_url, timeout=5).json()
+        versions = requests.get(
+            "https://ddragon.leagueoflegends.com/api/versions.json", timeout=5
+        ).json()
         current_patch = versions[0] if versions else "unknown"
 
-        # Get champion data (no API key needed for Data Dragon)
         champ_url = f"https://ddragon.leagueoflegends.com/cdn/{current_patch}/data/en_US/champion.json"
         champ_data = requests.get(champ_url, timeout=5).json()
 
-        # Get free champion rotation (needs API key)
-        rotation_url = "https://na1.api.riotgames.com/lol/platform/v3/champion-rotations"
-        headers = {"X-Riot-Token": RIOT_API_KEY}
-        rotation = requests.get(rotation_url, headers=headers, timeout=5).json()
+        rotation = requests.get(
+            "https://na1.api.riotgames.com/lol/platform/v3/champion-rotations",
+            headers={"X-Riot-Token": RIOT_API_KEY},
+            timeout=5,
+        ).json()
 
         champion_names = {int(v["key"]): v["name"] for v in champ_data["data"].values()}
-        free_champs = [champion_names.get(cid, f"ID:{cid}") for cid in rotation.get("freeChampionIds", [])]
+        free_champs = [
+            champion_names.get(cid, f"ID:{cid}")
+            for cid in rotation.get("freeChampionIds", [])
+        ]
 
         return {
             "source": "riot_api",
@@ -56,77 +67,59 @@ def fetch_riot_lol_data():
             "free_rotation": free_champs,
         }
     except Exception as e:
-        print(f"[WARN] Riot API failed: {e}")
+        print(f"[WARN] Riot LoL API failed: {e}")
         return None
 
 
 def fetch_riot_valorant_data():
-    """Fetch live Valorant data from Riot/unofficial APIs."""
+    """Fetch Valorant agent data from the community API."""
     try:
-        # Valorant API (unofficial but reliable)
-        agents_url = "https://valorant-api.com/v1/agents?isPlayableCharacter=true"
-        response = requests.get(agents_url, timeout=5)
+        response = requests.get(
+            "https://valorant-api.com/v1/agents?isPlayableCharacter=true", timeout=5
+        )
         if response.status_code == 200:
-            agents_data = response.json().get("data", [])
-            agents_by_role = {}
-            for agent in agents_data:
+            agents = response.json().get("data", [])
+            by_role = {}
+            for agent in agents:
                 role = agent.get("role", {}).get("displayName", "Unknown")
-                name = agent.get("displayName", "Unknown")
-                if role not in agents_by_role:
-                    agents_by_role[role] = []
-                agents_by_role[role].append(name)
-
+                by_role.setdefault(role, []).append(agent.get("displayName", "Unknown"))
             return {
                 "source": "valorant_api",
-                "total_agents": len(agents_data),
-                "agents_by_role": agents_by_role,
+                "total_agents": len(agents),
+                "agents_by_role": by_role,
             }
     except Exception as e:
         print(f"[WARN] Valorant API failed: {e}")
     return None
 
 
-# === GEMINI AI SEARCH (works for ANY game) ===
+# ── Gemini AI Search ────────────────────────────────────────────
+
 
 def fetch_via_gemini(game_name, query_type="meta"):
-    """Use Gemini to get current game information.
-    
-    This is the universal fallback — works for ANY game because
-    Gemini has broad knowledge. We structure the prompt to get
-    consistent, parseable data back.
-    """
+    """Use Gemini to generate current game information (universal fallback)."""
     prompts = {
-        "meta": f"""Provide the current meta information for {game_name} as of today. 
-Include:
-- Current patch/version/season
-- Top tier characters/champions/agents/weapons (whatever applies)
-- Current meta summary (2-3 sentences)
-- 5 specific tips for ranked/competitive play
-
-Respond in valid JSON format like this:
-{{"patch": "...", "top_tier": {{"role1": ["char1", "char2"], "role2": ["char3"]}}, "meta_summary": "...", "tips": ["tip1", "tip2", "tip3", "tip4", "tip5"]}}
-Only respond with JSON, no markdown formatting.""",
-
-        "general": f"""Provide general information about {game_name}.
-Include:
-- Developer
-- Genre (list)
-- Platforms
-- Player count format
-- Brief description (2 sentences)
-- Difficulty level
-- Time per match
-- Free to play or not
-- 5 beginner tips
-
-Respond in valid JSON format:
-{{"developer": "...", "genre": ["..."], "platforms": ["..."], "player_count": "...", "description": "...", "difficulty": "...", "time_commitment": "...", "free_to_play": true, "beginner_tips": ["tip1", "tip2", "tip3", "tip4", "tip5"]}}
-Only respond with JSON, no markdown formatting.""",
-
-        "recommendations": f"""Suggest 6 games similar to {game_name} and explain briefly why each is similar.
-Respond in valid JSON format:
-{{"similar_games": [{{"name": "...", "reason": "..."}}, ...]}}
-Only respond with JSON, no markdown formatting.""",
+        "meta": (
+            f"Provide the current meta information for {game_name} as of today.\n"
+            "Include: current patch/version/season, top tier characters/weapons, "
+            "current meta summary (2-3 sentences), 5 tips for ranked play.\n"
+            'Respond in valid JSON: {{"patch": "...", "top_tier": {{}}, '
+            '"meta_summary": "...", "tips": [...]}}\n'
+            "Only respond with JSON, no markdown."
+        ),
+        "general": (
+            f"Provide general information about {game_name}.\n"
+            "Include: developer, genre list, platforms, player count, brief description, "
+            "difficulty, time per match, free to play status, 5 beginner tips.\n"
+            'Respond in valid JSON: {{"developer": "...", "genre": [...], '
+            '"platforms": [...], "description": "...", "difficulty": "...", '
+            '"beginner_tips": [...]}}\nOnly respond with JSON, no markdown.'
+        ),
+        "recommendations": (
+            f"Suggest 6 games similar to {game_name} with brief reasons.\n"
+            'Respond in valid JSON: {{"similar_games": [{{"name": "...", "reason": "..."}}, ...]}}\n'
+            "Only respond with JSON, no markdown."
+        ),
     }
 
     prompt = prompts.get(query_type, prompts["general"])
@@ -135,11 +128,10 @@ Only respond with JSON, no markdown formatting.""",
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=[prompt],
-            config={"temperature": 0.3, "max_output_tokens": 800}
+            config={"temperature": 0.3, "max_output_tokens": 800},
         )
 
         text = response.text.strip()
-        # Clean markdown code blocks if present
         if text.startswith("```"):
             text = text.split("\n", 1)[1] if "\n" in text else text[3:]
         if text.endswith("```"):
@@ -148,37 +140,31 @@ Only respond with JSON, no markdown formatting.""",
 
         return json.loads(text)
     except json.JSONDecodeError:
-        # If JSON parsing fails, return the raw text
         return {"raw_response": response.text, "source": "gemini_raw"}
     except Exception as e:
         print(f"[WARN] Gemini fetch failed for {game_name}: {e}")
         return None
 
 
-# === MAIN FETCH FUNCTION ===
+# ── Main Fetch Function ─────────────────────────────────────────
+
 
 def fetch_game_data(game_name, query_type="meta", force_refresh=False):
     """
     Fetch game data using the best available source.
-    
-    Priority chain:
-    1. MongoDB cache (if fresh)
-    2. Official API (Riot for LoL/Val/TFT)
-    3. Gemini AI search (universal fallback)
-    4. Static JSON (last resort)
-    
-    Returns dict with data + metadata about source.
+
+    Priority: cache → official API → Gemini AI → static JSON.
     """
     cache_key = f"game:{game_name.lower().replace(' ', '_')}:{query_type}"
 
-    # 1. Check cache first (unless force refresh)
+    # 1. Cache
     if not force_refresh:
         cached = get_cached(cache_key)
         if cached:
             cached["_cache"] = "hit"
             return cached
 
-    # 2. Try official APIs for supported games
+    # 2. Official APIs
     api_data = None
     game_lower = game_name.lower()
 
@@ -188,7 +174,6 @@ def fetch_game_data(game_name, query_type="meta", force_refresh=False):
         api_data = fetch_riot_valorant_data()
 
     if api_data:
-        # Merge API data with Gemini-generated meta
         gemini_data = fetch_via_gemini(game_name, query_type)
         if gemini_data:
             api_data.update(gemini_data)
@@ -197,7 +182,7 @@ def fetch_game_data(game_name, query_type="meta", force_refresh=False):
         api_data["_cache"] = "miss"
         return api_data
 
-    # 3. Gemini AI search (works for ANY game)
+    # 3. Gemini AI search
     gemini_data = fetch_via_gemini(game_name, query_type)
     if gemini_data:
         gemini_data["_source"] = "gemini"
@@ -213,15 +198,11 @@ def fetch_game_data(game_name, query_type="meta", force_refresh=False):
         static_data["_cache"] = "fallback"
         return static_data
 
-    return {
-        "_source": "none",
-        "_cache": "miss",
-        "error": f"Could not find data for '{game_name}'"
-    }
+    return {"_source": "none", "_cache": "miss", "error": f"No data found for '{game_name}'"}
 
 
 def fetch_recommendations_for(game_name):
-    """Get dynamic recommendations for a game."""
+    """Get dynamic game recommendations, cached in MongoDB."""
     cache_key = f"recs:{game_name.lower().replace(' ', '_')}"
 
     cached = get_cached(cache_key)
@@ -235,7 +216,7 @@ def fetch_recommendations_for(game_name):
         set_cached(cache_key, data, source="gemini")
         return data
 
-    # Fallback to static recommendations
+    # Static fallback
     filepath = KNOWLEDGE_DIR / "recommendations.json"
     if filepath.exists():
         with open(filepath, "r", encoding="utf-8") as f:

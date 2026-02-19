@@ -1,16 +1,3 @@
-"""
-Configuration Module
-Loads all settings from .env file.
-
-WHY .env FILES?
-- Secrets (API keys, JWT secrets) should NEVER be in code
-- Different environments (dev, staging, production) have different settings
-- .gitignore excludes .env so secrets don't get pushed to GitHub
-
-This is the same pattern used in Java's application.properties
-or Spring Boot's @Value annotations.
-"""
-
 import os
 from dotenv import load_dotenv
 

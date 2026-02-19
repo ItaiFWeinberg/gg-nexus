@@ -1,32 +1,26 @@
 @import "tailwindcss";
 
-/* Google Fonts - distinctive gaming typography */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Exo+2:ital,wght@0,100..900;1,100..900&display=swap');
 
 @theme {
-  /* Backgrounds */
   --color-nox-bg: #06060e;
   --color-nox-dark: #0c0c1a;
   --color-nox-card: #111125;
   --color-nox-hover: #181835;
-  
-  /* Borders */
+
   --color-nox-border: #1f1f45;
   --color-nox-border-light: #2a2a5a;
-  
-  /* Neon Red */
+
   --color-nox-red: #ff2d55;
   --color-nox-red-bright: #ff4d6d;
   --color-nox-red-dim: #cc1a3a;
   --color-nox-red-glow: rgba(255, 45, 85, 0.15);
   --color-nox-red-glow-strong: rgba(255, 45, 85, 0.35);
-  
-  /* Text */
+
   --color-nox-text: #e2e2f0;
   --color-nox-muted: #7070a0;
   --color-nox-subtle: #4a4a70;
-  
-  /* Status */
+
   --color-nox-green: #00ff88;
   --color-nox-gold: #ffd700;
   --color-nox-blue: #4d8eff;
@@ -38,13 +32,11 @@ body {
   font-family: 'Exo 2', 'Segoe UI', system-ui, sans-serif;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-nox-border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-nox-red); }
 
-/* Animations */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-10px); }
@@ -88,31 +80,24 @@ body {
 .animate-float { animation: float 3s ease-in-out infinite; }
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 .animate-slide-up { animation: slide-up 0.6s ease-out forwards; }
-.animate-gradient { 
-  background-size: 200% 200%; 
-  animation: gradient-shift 3s ease infinite; 
-}
+.animate-gradient { background-size: 200% 200%; animation: gradient-shift 3s ease infinite; }
 .animate-spin-slow { animation: spin-slow 20s linear infinite; }
 
-/* Stagger animations */
 .stagger-1 { animation-delay: 0.1s; opacity: 0; }
 .stagger-2 { animation-delay: 0.2s; opacity: 0; }
 .stagger-3 { animation-delay: 0.3s; opacity: 0; }
 .stagger-4 { animation-delay: 0.4s; opacity: 0; }
 .stagger-5 { animation-delay: 0.5s; opacity: 0; }
 
-/* Glass morphism */
 .glass {
   background: rgba(17, 17, 37, 0.7);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(31, 31, 69, 0.5);
 }
 
-/* Neon text */
 .neon-text {
   text-shadow: 0 0 7px rgba(255,45,85,0.6), 0 0 20px rgba(255,45,85,0.3), 0 0 40px rgba(255,45,85,0.1);
 }
 
-/* Heading font */
 .font-gaming { font-family: 'Orbitron', monospace; }
 .font-display { font-family: 'Rajdhani', sans-serif; }
