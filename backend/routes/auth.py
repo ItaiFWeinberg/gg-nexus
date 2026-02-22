@@ -1,17 +1,20 @@
 """Authentication routes — JWT-based signup, login, and token verification."""
 
 import jwt
+import threading
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify
 from functools import wraps
-from models.user import create_user, find_user_by_username, find_user_by_id, verify_password
+from models.user import (
+    create_user, find_user_by_username, find_user_by_id,
+    verify_password, update_user_profile, update_ai_profile,
+)
 from config import JWT_SECRET, JWT_EXPIRATION_HOURS
 
 auth_bp = Blueprint("auth", __name__)
 
 
 def generate_token(user_id):
-    """Create a signed JWT token with user_id and expiration."""
     payload = {
         "user_id": str(user_id),
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
@@ -21,8 +24,6 @@ def generate_token(user_id):
 
 
 def token_required(f):
-    """Decorator — validates JWT and injects current_user into the route."""
-
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
@@ -48,9 +49,19 @@ def token_required(f):
     return decorated
 
 
+def _build_ai_profile_async(user_id, profile_data, username):
+    """Run AI profile building in a background thread so signup doesn't block."""
+    try:
+        from agents.profile_intelligence import build_ai_profile
+        ai_profile = build_ai_profile(profile_data, username)
+        update_ai_profile(user_id, ai_profile)
+        print(f"[OK] AI profile built for {username}: {ai_profile.get('player_archetype', '?')}")
+    except Exception as e:
+        print(f"[WARN] Background AI profile build failed for {username}: {e}")
+
+
 @auth_bp.route("/api/auth/signup", methods=["POST"])
 def signup():
-    """Create a new user account and return a JWT."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
@@ -76,7 +87,6 @@ def signup():
 
 @auth_bp.route("/api/auth/login", methods=["POST"])
 def login():
-    """Authenticate a user and return a JWT."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
@@ -101,22 +111,29 @@ def login():
 @auth_bp.route("/api/auth/me", methods=["GET"])
 @token_required
 def get_current_user(current_user):
-    """Return the authenticated user's profile."""
     return jsonify({"user": current_user})
 
 
 @auth_bp.route("/api/auth/profile", methods=["PUT"])
 @token_required
 def update_profile(current_user):
-    """Update the user's gaming profile (onboarding & settings)."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
 
-    from models.user import update_user_profile
-
     profile_data = data.get("profile", data)
+    print(f"[DEBUG] Profile update for {current_user.get('username')}: games={profile_data.get('favorite_games', [])}")
     update_user_profile(current_user["_id"], profile_data)
+
+    # Build AI profile in background (non-blocking)
+    has_games = bool(profile_data.get("favorite_games"))
+    if has_games:
+        thread = threading.Thread(
+            target=_build_ai_profile_async,
+            args=(current_user["_id"], profile_data, current_user.get("username", "Player")),
+        )
+        thread.daemon = True
+        thread.start()
 
     updated_user = find_user_by_id(current_user["_id"])
     return jsonify({"message": "Profile updated", "user": updated_user})

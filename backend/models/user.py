@@ -13,17 +13,12 @@ conversations_collection = db.conversations
 
 
 def hash_password(password):
-    """Hash a password with bcrypt (auto-salted, 12 rounds)."""
     salt = bcrypt.gensalt(rounds=12)
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 def verify_password(password, hashed_password):
-    """Verify a plaintext password against its bcrypt hash."""
-    return bcrypt.checkpw(
-        password.encode("utf-8"),
-        hashed_password.encode("utf-8"),
-    )
+    return bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 
 DEFAULT_PROFILE = {
@@ -34,16 +29,11 @@ DEFAULT_PROFILE = {
     "skill_levels": {},
     "ranks": {},
     "main_roles": {},
-    "personal": {
-        "age_range": "",
-        "gender": "",
-        "region": "",
-    },
+    "personal": {"age_range": "", "gender": "", "region": ""},
 }
 
 
 def create_user(username, email, password):
-    """Create a new user. Returns sanitized user dict or None if duplicate."""
     if users_collection.find_one({"$or": [{"username": username}, {"email": email}]}):
         return None
 
@@ -52,11 +42,8 @@ def create_user(username, email, password):
         "email": email,
         "password_hash": hash_password(password),
         "profile": dict(DEFAULT_PROFILE),
-        "preferences": {
-            "genres": [],
-            "play_sessions": "evening",
-            "solo_vs_team": "both",
-        },
+        "ai_profile": None,
+        "preferences": {"genres": [], "play_sessions": "evening", "solo_vs_team": "both"},
         "created_at": datetime.utcnow(),
         "last_active": datetime.utcnow(),
     }
@@ -67,14 +54,11 @@ def create_user(username, email, password):
 
 
 def find_user_by_username(username):
-    """Find user by username — includes password hash for verification."""
     return users_collection.find_one({"username": username})
 
 
 def find_user_by_id(user_id):
-    """Find user by ID — returns sanitized (no password)."""
     from bson import ObjectId
-
     user = users_collection.find_one({"_id": ObjectId(user_id)})
     return sanitize_user(user) if user else None
 
@@ -88,13 +72,10 @@ def update_user_profile(user_id, profile_data):
         return
 
     existing = current.get("profile", {})
-
-    # Ensure existing has all default keys
     for key in DEFAULT_PROFILE:
         if key not in existing:
             existing[key] = DEFAULT_PROFILE[key]
 
-    # Merge incoming data
     for key in DEFAULT_PROFILE:
         if key in profile_data:
             if key == "personal" and isinstance(profile_data[key], dict):
@@ -110,58 +91,26 @@ def update_user_profile(user_id, profile_data):
     )
 
 
-def get_user_profile_summary(user_id):
-    """Build a rich text summary of the user's profile for the AI agent."""
+def update_ai_profile(user_id, ai_profile_data):
+    """Store or update the AI-generated player analysis."""
     from bson import ObjectId
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"ai_profile": ai_profile_data, "last_active": datetime.utcnow()}},
+    )
 
+
+def get_full_user(user_id):
+    """Get user with all fields including ai_profile (for backend use only)."""
+    from bson import ObjectId
     user = users_collection.find_one({"_id": ObjectId(user_id)})
-    if not user:
-        return "No profile data available."
-
-    profile = user.get("profile", {})
-    parts = [f"Username: {user.get('username', 'Player')}"]
-
-    # Personal info
-    personal = profile.get("personal", {})
-    if personal.get("age_range"):
-        parts.append(f"Age range: {personal['age_range']}")
-    if personal.get("gender") and personal["gender"] != "Prefer not to say":
-        parts.append(f"Gender: {personal['gender']}")
-    if personal.get("region"):
-        parts.append(f"Region: {personal['region']}")
-
-    games = profile.get("favorite_games", [])
-    if games:
-        parts.append(f"Favorite games: {', '.join(games)}")
-
-    skill_levels = profile.get("skill_levels", {})
-    if skill_levels:
-        skills_str = ", ".join(f"{g}: {l}" for g, l in skill_levels.items())
-        parts.append(f"Skill levels: {skills_str}")
-
-    ranks = profile.get("ranks", {})
-    if ranks:
-        ranks_str = ", ".join(f"{g}: {r}" for g, r in ranks.items())
-        parts.append(f"Current ranks: {ranks_str}")
-
-    main_roles = profile.get("main_roles", {})
-    if main_roles:
-        roles_str = ", ".join(f"{g}: {r}" for g, r in main_roles.items())
-        parts.append(f"Main roles: {roles_str}")
-
-    playstyle = profile.get("playstyle", [])
-    if playstyle:
-        parts.append(f"Playstyle: {', '.join(playstyle)}")
-
-    goals = profile.get("goals", [])
-    if goals:
-        parts.append(f"Goals: {', '.join(goals)}")
-
-    return "\n".join(parts)
+    if user:
+        user["_id"] = str(user["_id"])
+        user.pop("password_hash", None)
+    return user
 
 
 def sanitize_user(user):
-    """Strip sensitive fields before sending to the client."""
     if user:
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)

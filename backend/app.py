@@ -57,6 +57,7 @@ def chat_welcome(current_user):
     username = full_user.get("username", "Player")
 
     has_profile = bool(profile.get("favorite_games"))
+    print(f"[DEBUG] Welcome for {username}: has_profile={has_profile}, games={profile.get('favorite_games', [])}, ai_profile={'YES' if ai_profile else 'NO'}")
 
     if not has_profile:
         return jsonify({
@@ -64,11 +65,14 @@ def chat_welcome(current_user):
             "mood": "happy",
         })
 
-    # If AI profile isn't ready yet, wait briefly and retry once
+    # If AI profile isn't ready yet (background thread still building), poll for up to 5s
     if not ai_profile:
-        _time.sleep(1.5)
-        full_user = get_full_user(current_user["_id"])
-        ai_profile = full_user.get("ai_profile")
+        for _ in range(10):
+            _time.sleep(0.5)
+            full_user = get_full_user(current_user["_id"])
+            ai_profile = full_user.get("ai_profile")
+            if ai_profile:
+                break
 
     message = generate_welcome_message(profile, ai_profile, username)
     return jsonify({"message": message, "mood": "excited"})

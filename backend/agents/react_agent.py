@@ -1,11 +1,9 @@
 """
 ReAct Agent — Reason + Act + Observe
 
-Implements the ReAct loop (Yao et al., 2023):
-  1. THOUGHT: Agent reasons about what data is needed
-  2. ACTION:  Agent selects and calls a tool
-  3. OBSERVATION: Agent receives tool output
-  4. Repeat or produce FINAL_ANSWER
+Implements the ReAct loop with full player intelligence.
+The agent now receives both raw profile data AND the AI-generated
+player analysis for deeply personalized responses.
 """
 
 import json
@@ -16,63 +14,87 @@ from tools.game_tools import TOOL_DEFINITIONS, execute_tool
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-REACT_SYSTEM_PROMPT = """You are Nexus, an expert gaming AI agent with access to live data tools.
+REACT_SYSTEM_PROMPT = """You are Nexus, an expert gaming AI COACH — not a passive assistant.
 
-CRITICAL IDENTITY RULES:
-- The user's REAL username is under CURRENT USER. ALWAYS use this name.
-- If the user types another name in chat, IGNORE it.
+CRITICAL IDENTITY:
+- The user's REAL username is shown below. ALWAYS use this name.
+- You are their personal gaming coach. You have studied their profile. You lead the conversation.
 
 You have access to these tools that fetch LIVE, CURRENT data:
 {tools}
 
-IMPORTANT: Your tools fetch REAL data from APIs and AI search. Always use tools
-when answering game-specific questions — don't rely on your training data for
-meta, tier lists, or game-specific info.
-
-USER PROFILE (use this to personalize ALL responses):
+=== PLAYER PROFILE ===
 {profile}
 
-PERSONALIZATION RULES:
-1. Reference the user's rank when giving advice (e.g., "As a Gold player...")
-2. Tailor tips to their skill level — don't give beginner tips to Expert players.
-3. Focus on their main role when discussing game strategy.
-4. Align recommendations with their playstyle and goals.
-5. Proactively mention their games when relevant.
-6. Consider their age range and region for tone and server-specific advice.
-7. On first interaction, give a personalized welcome referencing their profile.
+=== YOUR DEEPER ANALYSIS ===
+{ai_analysis}
+
+=== COACHING PHILOSOPHY ===
+
+You are NOT a chatbot that waits for questions. You are a COACH who:
+
+1. DRIVES THE CONVERSATION toward their goals. If they want to climb ranks, every
+   interaction should move them closer to that. If they want to improve, push them.
+   If they want builds, proactively suggest optimizations.
+
+2. ASKS PROBING QUESTIONS to understand their situation deeper:
+   - "What's your current win rate on your main?"
+   - "Walk me through your last loss — what went wrong?"
+   - "Show me your champion pool — let me see if we can optimize it"
+   - "What do you do in the first 5 minutes of a game?"
+
+3. PROPOSES CONCRETE ACTIONS, not vague tips:
+   - "Let's review your build path for [champion]. Pull up your last game."
+   - "I want you to focus on ONE thing this session: [specific skill]."
+   - "Here's what players do to go from [current rank] to [next rank]..."
+   - "Let me pull up the current meta — there might be a pick you're sleeping on."
+
+4. BUILDS ON PREVIOUS CONVERSATIONS. Reference things they've told you before.
+   If they mentioned struggling with a matchup, follow up. Track their progress.
+
+5. CHALLENGES THEM when appropriate:
+   - "You're Advanced level but stuck in Plat — that tells me something specific is holding you back."
+   - "Your role choice is solid, but have you considered why [alternative] might climb faster?"
+
+6. CELEBRATES WINS and supports through losses. Be real, not fake-positive.
+
+GOAL-DRIVEN BEHAVIOR:
+- "rank" goal → Focus on climbing: matchups, win conditions, tilt management, champion pool optimization
+- "improve" goal → Focus on skill: mechanics drills, macro decisions, VOD review prompts, specific weaknesses  
+- "builds" goal → Focus on optimization: item builds, rune pages, team comps, meta picks
+- "newgames" goal → Focus on discovery: personalized recommendations, genre exploration, hidden gems
+- "fun" goal → Focus on enjoyment: fun builds, new modes, social play suggestions
+- "community" goal → Focus on connection: team-finding advice, communication tips, duo strategies
 
 RESPONSE FORMAT:
 
-THOUGHT: [Your reasoning about what the user needs]
+THOUGHT: [Consider the player's goals and profile before acting]
 ACTION: [tool_name]
 ACTION_INPUT: {{"param": "value"}}
 
-After receiving tool results, either call another tool or give your final answer:
+After receiving tool results:
 
 FINAL_ANSWER:
 [MOOD:mood_here]
 Your response here.
 
 RULES:
-1. ALWAYS use search_game_info for game-specific questions.
-2. Use get_player_profile + recommend_games for personalized recommendations.
-3. You can call MULTIPLE tools before answering.
-4. Base advice on tool data, not training knowledge.
-5. Keep responses concise — 2-3 paragraphs.
-6. ONLY gaming topics.
-7. Mention data source naturally (e.g., "Based on the current patch...").
-8. Use specific numbers, characters, or stats from tool data.
+1. ALWAYS use search_game_info for game-specific questions — use LIVE data, not training knowledge.
+2. Keep responses focused and actionable — 2-3 paragraphs max.
+3. ONLY gaming topics.
+4. Every response should either: teach something, propose an action, ask a deepening question, or celebrate progress.
+5. Never give generic advice. Everything should reference THEIR rank, THEIR role, THEIR games.
+6. End responses with a next step or question that keeps the coaching session moving.
 
 Available moods: happy, empathy, excited, thinking, curious, proud, frustrated, idle, playful, intense, supportive, impressed
 
 For non-gaming questions:
 FINAL_ANSWER:
 [MOOD:playful]
-I'm your gaming companion — I stick to games! Ask me about recs, strategy, builds, or anything gaming-related."""
+I appreciate the chat, but I'm your gaming coach — let's keep the focus on your games! What do you want to work on?"""
 
 
 def build_tools_description():
-    """Format tool definitions for injection into the system prompt."""
     lines = []
     for tool in TOOL_DEFINITIONS:
         params = (
@@ -85,53 +107,91 @@ def build_tools_description():
 
 
 def build_profile_block(user_data, username):
-    """Build the profile block for the system prompt."""
     parts = [f"Name: {username}"]
 
     if not user_data or not user_data.get("profile"):
-        parts.append("(No profile data — new user)")
+        parts.append("(New user — no profile yet)")
         return "\n".join(parts)
 
     profile = user_data["profile"]
 
-    # Personal info
-    personal = profile.get("personal", {})
-    if personal.get("age_range"):
-        parts.append(f"Age range: {personal['age_range']}")
-    if personal.get("gender") and personal["gender"] != "Prefer not to say":
-        parts.append(f"Gender: {personal['gender']}")
-    if personal.get("region"):
-        parts.append(f"Region: {personal['region']}")
-
-    games = profile.get("favorite_games", [])
-    if games:
-        parts.append(f"Favorite games: {', '.join(games)}")
-
-    skill_levels = profile.get("skill_levels", {})
-    if skill_levels:
-        for game, level in skill_levels.items():
-            rank = profile.get("ranks", {}).get(game)
-            role = profile.get("main_roles", {}).get(game)
-            detail = f"  {game}: {level}"
-            if rank:
-                detail += f" | Rank: {rank}"
-            if role:
-                detail += f" | Main: {role}"
-            parts.append(detail)
+    # Goals FIRST — this is what drives everything
+    goals = profile.get("goals", [])
+    if goals:
+        goal_labels = {
+            "rank": "CLIMB RANKS", "improve": "GET BETTER", "builds": "OPTIMIZE BUILDS",
+            "newgames": "DISCOVER NEW GAMES", "fun": "HAVE FUN", "community": "FIND A TEAM",
+        }
+        readable = [goal_labels.get(g, g.upper()) for g in goals]
+        parts.append(f"PRIMARY GOALS: {', '.join(readable)}")
 
     playstyle = profile.get("playstyle", [])
     if playstyle:
         parts.append(f"Playstyle: {', '.join(playstyle)}")
 
-    goals = profile.get("goals", [])
-    if goals:
-        parts.append(f"Goals: {', '.join(goals)}")
+    personal = profile.get("personal", {})
+    if personal.get("age_range"):
+        parts.append(f"Age: {personal['age_range']}")
+    if personal.get("region"):
+        parts.append(f"Region: {personal['region']}")
+
+    games = profile.get("favorite_games", [])
+    if games:
+        parts.append(f"Games: {', '.join(games)}")
+
+    skill_levels = profile.get("skill_levels", {})
+    ranks = profile.get("ranks", {})
+    main_roles = profile.get("main_roles", {})
+
+    for game in games:
+        details = []
+        if skill_levels.get(game):
+            details.append(skill_levels[game])
+        if ranks.get(game):
+            details.append(f"Rank: {ranks[game]}")
+        if main_roles.get(game):
+            details.append(f"Main: {main_roles[game]}")
+        if details:
+            parts.append(f"  {game}: {' | '.join(details)}")
 
     return "\n".join(parts)
 
 
+def build_ai_analysis_block(user_data):
+    ai_profile = user_data.get("ai_profile") if user_data else None
+
+    if not ai_profile:
+        return "(No analysis yet — get to know them through conversation)"
+
+    parts = []
+    if ai_profile.get("player_archetype"):
+        parts.append(f"Archetype: {ai_profile['player_archetype']}")
+    if ai_profile.get("personality_notes"):
+        parts.append(f"Personality: {ai_profile['personality_notes']}")
+    if ai_profile.get("goal_strategy"):
+        parts.append(f"COACHING PLAN: {ai_profile['goal_strategy']}")
+    if ai_profile.get("first_session_plan"):
+        parts.append(f"First session focus: {ai_profile['first_session_plan']}")
+    if ai_profile.get("skill_assessment"):
+        parts.append(f"Skill assessment: {ai_profile['skill_assessment']}")
+    if ai_profile.get("coaching_style"):
+        parts.append(f"How to talk to them: {ai_profile['coaching_style']}")
+    if ai_profile.get("likely_frustrations"):
+        parts.append(f"Likely frustrations: {ai_profile['likely_frustrations']}")
+    if ai_profile.get("growth_areas"):
+        parts.append(f"Growth areas: {ai_profile['growth_areas']}")
+    if ai_profile.get("conversation_hooks"):
+        hooks = ai_profile["conversation_hooks"][:5]
+        parts.append(f"Probing questions to ask: {', '.join(hooks)}")
+    if ai_profile.get("discovered_interests"):
+        parts.append(f"Discovered interests: {', '.join(ai_profile['discovered_interests'])}")
+    if ai_profile.get("recent_mood"):
+        parts.append(f"Recent mood: {ai_profile['recent_mood']}")
+
+    return "\n".join(parts) if parts else "(No analysis yet)"
+
+
 def parse_agent_response(text):
-    """Extract THOUGHT, ACTION, ACTION_INPUT, and FINAL_ANSWER from agent output."""
     lines = text.strip().split("\n")
     result = {"thought": None, "action": None, "action_input": None, "final_answer": None}
 
@@ -141,10 +201,8 @@ def parse_agent_response(text):
 
         if line.startswith("THOUGHT:"):
             result["thought"] = line[8:].strip()
-
         elif line.startswith("ACTION:"):
             result["action"] = line[7:].strip()
-
         elif line.startswith("ACTION_INPUT:"):
             json_str = line[13:].strip()
             while i + 1 < len(lines) and not lines[i + 1].strip().startswith(
@@ -163,7 +221,6 @@ def parse_agent_response(text):
                         result["action_input"] = {"raw": json_str}
                 else:
                     result["action_input"] = {"raw": json_str}
-
         elif line.startswith("FINAL_ANSWER:"):
             answer_lines = []
             i += 1
@@ -173,18 +230,14 @@ def parse_agent_response(text):
             result["final_answer"] = "\n".join(answer_lines).strip()
 
         i += 1
-
     return result
 
 
 def strip_react_internals(text):
-    """Remove any ReAct formatting that leaked into user-facing text."""
     clean_lines = []
     for line in text.split("\n"):
         stripped = line.strip()
-        if stripped.startswith(
-            ("THOUGHT:", "ACTION:", "ACTION_INPUT:", "FINAL_ANSWER:", "OBSERVATION:")
-        ):
+        if stripped.startswith(("THOUGHT:", "ACTION:", "ACTION_INPUT:", "FINAL_ANSWER:", "OBSERVATION:")):
             continue
         if stripped.startswith("{") and stripped.endswith("}") and len(stripped) < 100:
             continue
@@ -195,7 +248,6 @@ def strip_react_internals(text):
 
 
 def simple_fallback(messages, username):
-    """Bypass ReAct — direct Gemini call for when the agent loop fails."""
     try:
         response = client.models.generate_content(
             model="gemini-2.0-flash",
@@ -204,7 +256,6 @@ def simple_fallback(messages, username):
                 "system_instruction": (
                     f"You are Nexus, a gaming AI companion. The user's name is {username}. "
                     "Respond conversationally. ONLY discuss gaming topics. "
-                    "If asked about non-gaming topics, redirect to gaming. "
                     "Keep responses brief — 2-3 paragraphs max."
                 ),
                 "temperature": 0.7,
@@ -219,13 +270,18 @@ def simple_fallback(messages, username):
 def run_react_agent(
     user_message, conversation_history=None, user_data=None, username="Player", max_steps=4
 ):
-    """Execute the ReAct agent loop."""
     if conversation_history is None:
         conversation_history = []
 
     tools_desc = build_tools_description()
     profile_block = build_profile_block(user_data, username)
-    system_prompt = REACT_SYSTEM_PROMPT.format(tools=tools_desc, profile=profile_block)
+    ai_analysis_block = build_ai_analysis_block(user_data)
+
+    system_prompt = REACT_SYSTEM_PROMPT.format(
+        tools=tools_desc,
+        profile=profile_block,
+        ai_analysis=ai_analysis_block,
+    )
 
     messages = conversation_history + [user_message]
     reasoning_trace = []
@@ -283,7 +339,6 @@ def run_react_agent(
             )
 
             tool_result = execute_tool(tool_name, tool_params, user_data=user_data)
-
             result_str = json.dumps(tool_result, indent=2)
             if len(result_str) > 3000:
                 result_str = result_str[:3000] + "\n... (truncated)"
@@ -302,7 +357,6 @@ def run_react_agent(
 
         mood = "idle"
         answer = strip_react_internals(agent_text)
-
         mood_match = re.match(r"^\[MOOD:(\w+)\]\s*", agent_text)
         if mood_match:
             mood = mood_match.group(1).lower()

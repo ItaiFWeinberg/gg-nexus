@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { RiSendPlaneFill, RiAddLine, RiHistoryLine, RiCloseLine, RiChat3Line } from 'react-icons/ri';
-import { sendMessage, newSession, getSessionId, setSessionId, getSessionHistory, getChatSessions } from '../services/api';
+import { sendMessage, getWelcomeMessage, newSession, getSessionId, setSessionId, getSessionHistory, getChatSessions } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import BotAvatar from '../components/BotAvatar';
 
@@ -41,79 +41,55 @@ function formatTimeAgo(isoString) {
   return `${days}d ago`;
 }
 
-function buildWelcomeMessage(user) {
-  const profile = user?.profile || {};
-  const name = user?.username || 'Player';
-  const games = profile.favorite_games || [];
-  const ranks = profile.ranks || {};
-  const roles = profile.main_roles || {};
-  const playstyle = (profile.playstyle || [])[0] || '';
-  const goals = profile.goals || [];
-
-  if (games.length === 0) {
-    return `Hey ${name}! I'm Nexus, your gaming AI companion. Tell me what games you play and I'll help with builds, strategy, recommendations — anything gaming!`;
-  }
-
-  let msg = `Hey ${name}! `;
-
-  const gameDetails = games.slice(0, 3).map(g => {
-    let detail = g;
-    if (ranks[g]) detail += ` (${ranks[g]})`;
-    if (roles[g]) detail += ` — ${roles[g]} main`;
-    return detail;
-  });
-
-  msg += `I see you're into ${gameDetails.join(', ')}`;
-  if (games.length > 3) msg += ` and ${games.length - 3} more`;
-  msg += '. ';
-
-  if (playstyle === 'competitive') msg += "Competitive mindset — I respect it. ";
-  else if (playstyle === 'casual') msg += "Love the chill vibes. ";
-  else if (playstyle === 'explorer') msg += "Always finding new games — nice! ";
-
-  if (goals.includes('rank')) msg += "Ready to help you climb. ";
-  else if (goals.includes('improve')) msg += "Let's sharpen those skills. ";
-  else if (goals.includes('newgames')) msg += "I've got some great recommendations. ";
-
-  msg += "What can I help with today?";
-  return msg;
-}
-
 export default function Chat() {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [botMood, setBotMood] = useState('happy');
-  const [initialLoad, setInitialLoad] = useState(true);
+  const [welcomeLoading, setWelcomeLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [currentSession, setCurrentSession] = useState(getSessionId());
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const welcomeFetched = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const showWelcome = useCallback(() => {
-    const welcomeText = buildWelcomeMessage(user);
-    setMessages([{ role: 'assistant', content: welcomeText }]);
-    setBotMood('happy');
-    setInitialLoad(false);
-  }, [user]);
-
+  // Fetch AI-generated welcome ONCE on first load
   useEffect(() => {
-    if (initialLoad) showWelcome();
-  }, [initialLoad, showWelcome]);
+    if (welcomeFetched.current) return;
+    welcomeFetched.current = true;
+
+    (async () => {
+      setWelcomeLoading(true);
+      try {
+        const data = await getWelcomeMessage();
+        setMessages([{ role: 'assistant', content: data.message, mood: data.mood || 'excited' }]);
+        setBotMood(data.mood || 'excited');
+      } catch {
+        const name = user?.username || 'Player';
+        setMessages([{
+          role: 'assistant',
+          content: `Hey ${name}! I'm Nexus, ready to help with anything gaming. What's on your mind?`,
+          mood: 'happy',
+        }]);
+      } finally {
+        setWelcomeLoading(false);
+      }
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, [isLoading]);
+    if (!welcomeLoading) inputRef.current?.focus();
+  }, [isLoading, welcomeLoading]);
 
   const handleSend = async () => {
     const trimmed = input.trim();
@@ -161,10 +137,24 @@ export default function Chat() {
     }
   };
 
+  const fetchFreshWelcome = async () => {
+    setWelcomeLoading(true);
+    try {
+      const data = await getWelcomeMessage();
+      setMessages([{ role: 'assistant', content: data.message, mood: data.mood || 'excited' }]);
+      setBotMood(data.mood || 'excited');
+    } catch {
+      const name = user?.username || 'Player';
+      setMessages([{ role: 'assistant', content: `Hey ${name}! What's on your mind?`, mood: 'happy' }]);
+    } finally {
+      setWelcomeLoading(false);
+    }
+  };
+
   const handleNewSession = () => {
     const id = newSession();
     setCurrentSession(id);
-    showWelcome();
+    fetchFreshWelcome();
   };
 
   const loadSession = async (sessionId) => {
@@ -176,9 +166,12 @@ export default function Chat() {
         role: m.role,
         content: stripMoodTags(m.content),
       }));
-      setMessages(msgs.length > 0 ? msgs : [{ role: 'assistant', content: buildWelcomeMessage(user) }]);
+      if (msgs.length > 0) {
+        setMessages(msgs);
+      } else {
+        fetchFreshWelcome();
+      }
       setShowHistory(false);
-      setInitialLoad(false);
     } catch {
       setShowHistory(false);
     }
@@ -206,7 +199,7 @@ export default function Chat() {
           <div>
             <h2 className="text-sm font-semibold text-white">Nexus AI</h2>
             <p className="text-[10px] text-nox-muted">
-              {isLoading ? 'Thinking...' : botMood === 'idle' ? 'Ready' : botMood.charAt(0).toUpperCase() + botMood.slice(1)}
+              {isLoading ? 'Thinking...' : welcomeLoading ? 'Loading...' : botMood === 'idle' ? 'Ready' : botMood.charAt(0).toUpperCase() + botMood.slice(1)}
             </p>
           </div>
         </div>
@@ -244,7 +237,7 @@ export default function Chat() {
                     <RiChat3Line className="text-nox-subtle text-xs shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs text-white truncate">{s.preview || 'Chat session'}</p>
-                      <p className="text-[10px] text-nox-subtle">{s.message_count} msgs • {formatTimeAgo(s.last_message)}</p>
+                      <p className="text-[10px] text-nox-subtle">{s.message_count} msgs • {formatTimeAgo(s.last_time)}</p>
                     </div>
                   </div>
                 </button>
@@ -256,6 +249,19 @@ export default function Chat() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        {welcomeLoading && messages.length === 0 && (
+          <div className="flex gap-3">
+            <BotAvatar mood="thinking" size={32} />
+            <div className="bg-nox-card border border-nox-border rounded-2xl rounded-bl-md px-4 py-3">
+              <div className="flex gap-1.5">
+                <div className="w-2 h-2 bg-nox-red rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-nox-red rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-nox-red rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          </div>
+        )}
+
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             style={{ animation: `slide-in-${msg.role === 'user' ? 'right' : 'left'} 0.3s ease-out` }}>
@@ -304,9 +310,9 @@ export default function Chat() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
             placeholder="Ask Nexus anything about gaming..."
-            disabled={isLoading}
+            disabled={isLoading || welcomeLoading}
             className="flex-1 bg-nox-card border border-nox-border rounded-xl px-4 py-3 text-sm text-white placeholder-nox-subtle focus:outline-none focus:border-nox-red/50 disabled:opacity-50 transition-colors" />
-          <button onClick={handleSend} disabled={isLoading || !input.trim()}
+          <button onClick={handleSend} disabled={isLoading || welcomeLoading || !input.trim()}
             className="p-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-30 rounded-xl transition-all hover:shadow-[0_0_15px_rgba(255,45,85,0.3)]">
             <RiSendPlaneFill className="text-white text-lg" />
           </button>

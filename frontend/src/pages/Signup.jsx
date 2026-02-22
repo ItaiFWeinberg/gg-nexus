@@ -125,7 +125,7 @@ export default function Signup() {
         if (d.skill) skillLevels[name] = d.skill;
       });
 
-      await updateProfile({
+      const profilePayload = {
         favorite_games: allGames,
         playstyle: [selectedPlaystyle],
         goals: selectedGoals,
@@ -138,7 +138,11 @@ export default function Signup() {
           gender: gender,
           region: region,
         },
-      });
+      };
+
+      console.log('[SIGNUP] Sending profile:', JSON.stringify(profilePayload));
+      const profileResult = await updateProfile(profilePayload);
+      console.log('[SIGNUP] Profile response:', profileResult);
 
       // Give the backend AI profile builder ~2s to process, then refresh
       await new Promise(r => setTimeout(r, 2000));
