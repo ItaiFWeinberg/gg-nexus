@@ -34,6 +34,11 @@ DEFAULT_PROFILE = {
     "skill_levels": {},
     "ranks": {},
     "main_roles": {},
+    "personal": {
+        "age_range": "",
+        "gender": "",
+        "region": "",
+    },
 }
 
 
@@ -82,11 +87,22 @@ def update_user_profile(user_id, profile_data):
     if not current:
         return
 
-    existing = current.get("profile", dict(DEFAULT_PROFILE))
+    existing = current.get("profile", {})
 
+    # Ensure existing has all default keys
+    for key in DEFAULT_PROFILE:
+        if key not in existing:
+            existing[key] = DEFAULT_PROFILE[key]
+
+    # Merge incoming data
     for key in DEFAULT_PROFILE:
         if key in profile_data:
-            existing[key] = profile_data[key]
+            if key == "personal" and isinstance(profile_data[key], dict):
+                existing_personal = existing.get("personal", {})
+                existing_personal.update(profile_data[key])
+                existing["personal"] = existing_personal
+            else:
+                existing[key] = profile_data[key]
 
     users_collection.update_one(
         {"_id": ObjectId(user_id)},
@@ -104,6 +120,15 @@ def get_user_profile_summary(user_id):
 
     profile = user.get("profile", {})
     parts = [f"Username: {user.get('username', 'Player')}"]
+
+    # Personal info
+    personal = profile.get("personal", {})
+    if personal.get("age_range"):
+        parts.append(f"Age range: {personal['age_range']}")
+    if personal.get("gender") and personal["gender"] != "Prefer not to say":
+        parts.append(f"Gender: {personal['gender']}")
+    if personal.get("region"):
+        parts.append(f"Region: {personal['region']}")
 
     games = profile.get("favorite_games", [])
     if games:

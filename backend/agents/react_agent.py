@@ -38,7 +38,8 @@ PERSONALIZATION RULES:
 3. Focus on their main role when discussing game strategy.
 4. Align recommendations with their playstyle and goals.
 5. Proactively mention their games when relevant.
-6. On first interaction, give a personalized welcome referencing their profile.
+6. Consider their age range and region for tone and server-specific advice.
+7. On first interaction, give a personalized welcome referencing their profile.
 
 RESPONSE FORMAT:
 
@@ -92,6 +93,15 @@ def build_profile_block(user_data, username):
         return "\n".join(parts)
 
     profile = user_data["profile"]
+
+    # Personal info
+    personal = profile.get("personal", {})
+    if personal.get("age_range"):
+        parts.append(f"Age range: {personal['age_range']}")
+    if personal.get("gender") and personal["gender"] != "Prefer not to say":
+        parts.append(f"Gender: {personal['gender']}")
+    if personal.get("region"):
+        parts.append(f"Region: {personal['region']}")
 
     games = profile.get("favorite_games", [])
     if games:

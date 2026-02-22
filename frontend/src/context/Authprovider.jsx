@@ -44,9 +44,19 @@ export default function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const data = await getCurrentUser();
+      setUser(data.user);
+      return data.user;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const value = useMemo(() => ({
-    user, login, signup, logout, loading
-  }), [user, login, signup, logout, loading]);
+    user, login, signup, logout, loading, refreshUser
+  }), [user, login, signup, logout, loading, refreshUser]);
 
   return (
     <AuthContext.Provider value={value}>

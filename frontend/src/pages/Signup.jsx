@@ -28,25 +28,43 @@ const GOALS = [
   { id: 'community', label: 'Find Team', icon: '🤝' },
 ];
 
+const AGE_RANGES = ['Under 16', '16-20', '21-25', '26-30', '31-35', '36+'];
+const GENDERS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+const REGIONS = ['NA', 'EU West', 'EU East', 'Asia', 'OCE', 'Middle East', 'South America', 'Africa'];
+
 export default function Signup() {
   const [step, setStep] = useState(1);
+
+  // Step 1: Account
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // Step 2: Personal
+  const [ageRange, setAgeRange] = useState('');
+  const [gender, setGender] = useState('');
+  const [region, setRegion] = useState('');
+
+  // Step 3: Games
   const [selectedGames, setSelectedGames] = useState([]);
   const [customGames, setCustomGames] = useState([]);
   const [customGameInput, setCustomGameInput] = useState('');
+
+  // Step 4: Game Details
   const [gameDetails, setGameDetails] = useState({});
+
+  // Step 5: Style
   const [selectedPlaystyle, setSelectedPlaystyle] = useState('');
   const [selectedGoals, setSelectedGoals] = useState([]);
+
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [savedCreds, setSavedCreds] = useState(null);
 
-  const { signup } = useAuth();
+  const { signup, refreshUser } = useAuth();
   const navigate = useNavigate();
 
   const toggleGame = (id) => setSelectedGames(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
@@ -61,7 +79,6 @@ export default function Signup() {
   };
 
   const removeCustomGame = (game) => setCustomGames(prev => prev.filter(g => g !== game));
-
   const totalGames = selectedGames.length + customGames.length;
 
   const updateGameDetail = (gameId, field, value) => {
@@ -116,7 +133,15 @@ export default function Signup() {
         skill_levels: skillLevels,
         ranks: ranks,
         main_roles: mainRoles,
+        personal: {
+          age_range: ageRange,
+          gender: gender,
+          region: region,
+        },
       });
+
+      // Refresh user context so dashboard + chat have the full profile
+      await refreshUser();
 
       navigate('/chat');
     } catch (err) {
@@ -129,17 +154,19 @@ export default function Signup() {
 
   const stepConfig = [
     { n: 1, label: 'Account' },
-    { n: 2, label: 'Games' },
-    { n: 3, label: 'Details' },
-    { n: 4, label: 'Style' },
+    { n: 2, label: 'About You' },
+    { n: 3, label: 'Games' },
+    { n: 4, label: 'Details' },
+    { n: 5, label: 'Style' },
   ];
 
-  const botMoods = { 1: 'idle', 2: 'excited', 3: 'curious', 4: 'happy' };
+  const botMoods = { 1: 'idle', 2: 'curious', 3: 'excited', 4: 'thinking', 5: 'happy' };
   const botSpeeches = {
     1: "Let's get you set up.",
-    2: 'Pick everything you play!',
-    3: 'Tell me more about how you play.',
-    4: 'Last step — how do you game?',
+    2: 'Tell me a bit about yourself!',
+    3: 'Pick everything you play!',
+    4: 'Tell me more about how you play.',
+    5: 'Last step — how do you game?',
   };
 
   return (
@@ -160,13 +187,13 @@ export default function Signup() {
         <div className="flex items-center gap-1 mb-6">
           {stepConfig.map((s, i) => (
             <div key={s.n} className="flex items-center">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
+              <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-medium transition-all ${
                 s.n === step ? 'bg-nox-red text-white' : s.n < step ? 'bg-nox-red/20 text-nox-red' : 'bg-nox-border/50 text-nox-subtle'
               }`}>
                 <span className="font-bold">{s.n}</span>
                 <span className="hidden sm:inline">{s.label}</span>
               </div>
-              {i < stepConfig.length - 1 && <div className={`w-6 h-px mx-1 ${s.n < step ? 'bg-nox-red/40' : 'bg-nox-border'}`} />}
+              {i < stepConfig.length - 1 && <div className={`w-5 h-px mx-0.5 ${s.n < step ? 'bg-nox-red/40' : 'bg-nox-border'}`} />}
             </div>
           ))}
         </div>
@@ -232,8 +259,76 @@ export default function Signup() {
           </div>
         )}
 
-        {/* Step 2: Games */}
+        {/* Step 2: Personal */}
         {step === 2 && (
+          <div className="w-full max-w-lg animate-slide-up">
+            <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">ABOUT YOU</h1>
+            <p className="text-nox-muted text-center text-sm mb-6">Helps Nexus personalize your experience</p>
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-xs text-nox-muted uppercase tracking-widest mb-3">Age Range</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {AGE_RANGES.map((age) => (
+                    <button key={age} onClick={() => setAgeRange(age)}
+                      className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                        ageRange === age
+                          ? 'bg-nox-red-glow-strong border border-nox-red/40 text-white'
+                          : 'glass text-nox-muted hover:text-white hover:border-nox-red/20'
+                      }`}>
+                      {age}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-nox-muted uppercase tracking-widest mb-3">Gender</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {GENDERS.map((g) => (
+                    <button key={g} onClick={() => setGender(g)}
+                      className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                        gender === g
+                          ? 'bg-nox-red-glow-strong border border-nox-red/40 text-white'
+                          : 'glass text-nox-muted hover:text-white hover:border-nox-red/20'
+                      }`}>
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-nox-muted uppercase tracking-widest mb-3">Region</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {REGIONS.map((r) => (
+                    <button key={r} onClick={() => setRegion(r)}
+                      className={`px-2 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                        region === r
+                          ? 'bg-nox-red-glow-strong border border-nox-red/40 text-white'
+                          : 'glass text-nox-muted hover:text-white hover:border-nox-red/20'
+                      }`}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-nox-subtle text-center mt-4 mb-4">All optional — skip anything you'd rather not share.</p>
+
+            <div className="flex gap-3 max-w-md mx-auto">
+              <button onClick={() => setStep(1)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
+              <button onClick={() => setStep(3)}
+                className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright text-white font-gaming tracking-widest rounded-lg transition-all">
+                NEXT →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Games */}
+        {step === 3 && (
           <div className="w-full max-w-3xl animate-slide-up">
             <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">YOUR GAMES</h1>
             <p className="text-nox-muted text-center text-sm mb-6">Select the games you play</p>
@@ -277,8 +372,8 @@ export default function Signup() {
             </p>
 
             <div className="flex gap-3 max-w-md mx-auto">
-              <button onClick={() => setStep(1)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
-              <button onClick={() => totalGames > 0 && setStep(3)} disabled={totalGames === 0}
+              <button onClick={() => setStep(2)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
+              <button onClick={() => totalGames > 0 && setStep(4)} disabled={totalGames === 0}
                 className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-30 text-white font-gaming tracking-widest rounded-lg transition-all">
                 NEXT →
               </button>
@@ -286,11 +381,11 @@ export default function Signup() {
           </div>
         )}
 
-        {/* Step 3: Game Details */}
-        {step === 3 && (
+        {/* Step 4: Game Details */}
+        {step === 4 && (
           <div className="w-full max-w-3xl animate-slide-up">
             <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">YOUR DETAILS</h1>
-            <p className="text-nox-muted text-center text-sm mb-6">Tell Nexus your skill level, rank, and role for each game</p>
+            <p className="text-nox-muted text-center text-sm mb-6">Skill level, rank, and role for each game</p>
 
             <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1 mb-6">
               {selectedGames.map((id) => {
@@ -311,15 +406,13 @@ export default function Signup() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {/* Skill Level */}
                       <div>
                         <label className="block text-[10px] text-nox-muted uppercase tracking-widest mb-1.5">Skill Level</label>
                         <div className="flex flex-wrap gap-1.5">
                           {SKILL_LEVELS.map((skill) => (
                             <button key={skill} onClick={() => updateGameDetail(id, 'skill', skill)}
                               className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                                details.skill === skill
-                                  ? 'text-white' : 'bg-nox-border/30 text-nox-subtle hover:text-white'
+                                details.skill === skill ? 'text-white' : 'bg-nox-border/30 text-nox-subtle hover:text-white'
                               }`}
                               style={details.skill === skill ? { background: `${game.accent}30`, color: game.accent, border: `1px solid ${game.accent}50` } : {}}>
                               {skill}
@@ -328,7 +421,6 @@ export default function Signup() {
                         </div>
                       </div>
 
-                      {/* Rank */}
                       {game.ranks.length > 0 && (
                         <div>
                           <label className="block text-[10px] text-nox-muted uppercase tracking-widest mb-1.5">Rank</label>
@@ -341,7 +433,6 @@ export default function Signup() {
                         </div>
                       )}
 
-                      {/* Role */}
                       {game.roles.length > 0 && (
                         <div>
                           <label className="block text-[10px] text-nox-muted uppercase tracking-widest mb-1.5">Main Role</label>
@@ -349,8 +440,7 @@ export default function Signup() {
                             {game.roles.map((role) => (
                               <button key={role} onClick={() => updateGameDetail(id, 'role', role)}
                                 className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                                  details.role === role
-                                    ? 'text-white' : 'bg-nox-border/30 text-nox-subtle hover:text-white'
+                                  details.role === role ? 'text-white' : 'bg-nox-border/30 text-nox-subtle hover:text-white'
                                 }`}
                                 style={details.role === role ? { background: `${game.accent}30`, color: game.accent, border: `1px solid ${game.accent}50` } : {}}>
                                 {role}
@@ -364,7 +454,6 @@ export default function Signup() {
                 );
               })}
 
-              {/* Custom games — skill level only */}
               {customGames.map((name) => {
                 const key = `custom_${name}`;
                 const details = gameDetails[key] || {};
@@ -392,12 +481,12 @@ export default function Signup() {
             </div>
 
             <p className="text-[10px] text-nox-subtle text-center mb-4">
-              These details help Nexus give you rank-appropriate advice — skip any you're unsure about.
+              Skip anything you're unsure about — you can update later.
             </p>
 
             <div className="flex gap-3 max-w-md mx-auto">
-              <button onClick={() => setStep(2)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
-              <button onClick={() => setStep(4)}
+              <button onClick={() => setStep(3)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
+              <button onClick={() => setStep(5)}
                 className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright text-white font-gaming tracking-widest rounded-lg transition-all">
                 NEXT →
               </button>
@@ -405,8 +494,8 @@ export default function Signup() {
           </div>
         )}
 
-        {/* Step 4: Playstyle & Goals */}
-        {step === 4 && (
+        {/* Step 5: Playstyle & Goals */}
+        {step === 5 && (
           <div className="w-full max-w-2xl animate-slide-up">
             <h1 className="font-gaming text-2xl text-white text-center mb-1 tracking-wider">YOUR STYLE</h1>
             <p className="text-nox-muted text-center text-sm mb-6">How do you play?</p>
@@ -448,7 +537,7 @@ export default function Signup() {
             )}
 
             <div className="flex gap-3 max-w-md mx-auto">
-              <button onClick={() => setStep(3)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
+              <button onClick={() => setStep(4)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
               <button onClick={handleComplete} disabled={isLoading}
                 className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-30 text-white font-gaming tracking-widest rounded-lg transition-all hover:shadow-[0_0_20px_rgba(255,45,85,0.3)]">
                 {isLoading ? 'CREATING...' : 'ENTER NEXUS →'}
