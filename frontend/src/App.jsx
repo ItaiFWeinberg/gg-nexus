@@ -7,6 +7,9 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
+import Recommendations from './pages/Recommendations';
+import Stats from './pages/Stats';
+import Guides from './pages/Guides';
 
 function App() {
   return (
@@ -48,9 +51,9 @@ function ProtectedLayout() {
           <Route path="/" element={<Navigate to="/chat" />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/recommendations" element={<ComingSoon title="Game Recommendations" desc="AI-powered game discovery using RAG" phase="2" />} />
-          <Route path="/stats" element={<ComingSoon title="Performance Analytics" desc="Stats analysis with agent tools" phase="2" />} />
-          <Route path="/guides" element={<ComingSoon title="Strategy Hub" desc="Builds and guides via specialist agents" phase="2" />} />
+          <Route path="/recommendations" element={<Recommendations />} />
+          <Route path="/stats" element={<Stats />} />
+          <Route path="/guides" element={<Guides />} />
           <Route path="/community" element={<ComingSoon title="Community" desc="Share builds and connect with gamers" phase="3" />} />
         </Routes>
       </main>

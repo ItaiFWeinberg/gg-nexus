@@ -1,9 +1,11 @@
 """GG Nexus — Flask application entry point."""
 
+import threading
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from config import GEMINI_API_KEY
 from agents.react_agent import run_react_agent
+from agents.profile_intelligence import generate_welcome_message, evolve_profile
 from routes.auth import auth_bp, token_required
 from models.conversation import (
     save_message,
@@ -11,7 +13,7 @@ from models.conversation import (
     get_user_sessions,
     get_user_context_summary,
 )
-from models.user import find_user_by_id
+from models.user import find_user_by_id, get_full_user, update_ai_profile
 from tools.data_fetcher import fetch_game_data, fetch_recommendations_for
 import re
 import time
@@ -32,9 +34,44 @@ def health_check():
             "status": "ok",
             "message": "GG Nexus API is running",
             "version": "2.0",
-            "features": ["ReAct Agent", "RAG", "Tool Use", "Conversation Memory", "Live Dashboard"],
+            "features": [
+                "ReAct Agent", "RAG", "Tool Use", "Conversation Memory",
+                "Live Dashboard", "AI Profile Intelligence",
+            ],
         }
     )
+
+
+# ── Chat ─────────────────────────────────────────────────────────
+
+
+@app.route("/api/chat/welcome", methods=["GET"])
+@token_required
+def chat_welcome(current_user):
+    """Generate a personalized AI welcome message using the full player profile."""
+    import time as _time
+
+    full_user = get_full_user(current_user["_id"])
+    profile = full_user.get("profile", {})
+    ai_profile = full_user.get("ai_profile")
+    username = full_user.get("username", "Player")
+
+    has_profile = bool(profile.get("favorite_games"))
+
+    if not has_profile:
+        return jsonify({
+            "message": f"Hey {username}! I'm Nexus, your gaming AI. Tell me what games you play and I'll help with strategy, builds, recommendations — anything gaming!",
+            "mood": "happy",
+        })
+
+    # If AI profile isn't ready yet, wait briefly and retry once
+    if not ai_profile:
+        _time.sleep(1.5)
+        full_user = get_full_user(current_user["_id"])
+        ai_profile = full_user.get("ai_profile")
+
+    message = generate_welcome_message(profile, ai_profile, username)
+    return jsonify({"message": message, "mood": "excited"})
 
 
 @app.route("/api/chat", methods=["POST"])
@@ -55,7 +92,7 @@ def chat_endpoint(current_user):
 
     try:
         history = get_conversation_history(user_id, session_id)
-        full_user = find_user_by_id(user_id)
+        full_user = get_full_user(user_id)
 
         result = run_react_agent(
             user_message=user_message,
@@ -75,6 +112,9 @@ def chat_endpoint(current_user):
 
         save_message(user_id, "user", user_message, session_id)
         save_message(user_id, "assistant", ai_response, session_id)
+
+        # Evolve profile in background every 6+ messages
+        _maybe_evolve_profile(user_id, session_id, full_user)
 
         return jsonify(
             {
@@ -96,6 +136,42 @@ def chat_endpoint(current_user):
         if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
             return jsonify({"error": "AI is busy — please try again in a few seconds"}), 429
         return jsonify({"error": "Something went wrong. Please try again."}), 500
+
+
+def _maybe_evolve_profile(user_id, session_id, full_user):
+    """Run profile evolution in background if enough messages have accumulated."""
+    try:
+        from models.conversation import conversations_collection
+        msg_count = conversations_collection.count_documents(
+            {"user_id": user_id, "session_id": session_id}
+        )
+
+        # Evolve after every 6 messages in a session
+        if msg_count > 0 and msg_count % 6 == 0:
+            messages = list(
+                conversations_collection.find(
+                    {"user_id": user_id, "session_id": session_id}
+                ).sort("timestamp", -1).limit(10)
+            )
+            messages.reverse()
+
+            formatted = [{"role": m["role"], "content": m["content"]} for m in messages]
+            existing_ai = full_user.get("ai_profile")
+
+            def _evolve():
+                try:
+                    updated = evolve_profile(user_id, formatted, existing_ai)
+                    if updated:
+                        update_ai_profile(user_id, updated)
+                        print(f"[OK] Profile evolved for user {user_id}")
+                except Exception as e:
+                    print(f"[WARN] Profile evolution failed: {e}")
+
+            thread = threading.Thread(target=_evolve)
+            thread.daemon = True
+            thread.start()
+    except Exception:
+        pass
 
 
 @app.route("/api/chat/sessions", methods=["GET"])
@@ -128,13 +204,12 @@ def get_session_history(current_user, session_id):
     return jsonify({"messages": formatted, "session_id": session_id})
 
 
-# ── Dashboard API ────────────────────────────────────────────────
+# ── Dashboard ────────────────────────────────────────────────────
 
 
 @app.route("/api/dashboard/games", methods=["GET"])
 @token_required
 def dashboard_games(current_user):
-    """Fetch live data for each of the user's favorite games."""
     profile = current_user.get("profile", {})
     favorite_games = profile.get("favorite_games", [])
 
@@ -170,15 +245,13 @@ def dashboard_games(current_user):
 @app.route("/api/dashboard/game/<game_name>", methods=["GET"])
 @token_required
 def dashboard_single_game(current_user, game_name):
-    """Fetch detailed live data for a single game."""
     meta = fetch_game_data(game_name, "meta")
     general = fetch_game_data(game_name, "general")
     recs = fetch_recommendations_for(game_name)
 
-    meta.pop("_cache", None)
-    meta.pop("_source", None)
-    general.pop("_cache", None)
-    general.pop("_source", None)
+    for d in [meta, general]:
+        d.pop("_cache", None)
+        d.pop("_source", None)
 
     profile = current_user.get("profile", {})
 
@@ -196,11 +269,21 @@ def dashboard_single_game(current_user, game_name):
 @app.route("/api/dashboard/tip", methods=["GET"])
 @token_required
 def dashboard_tip(current_user):
-    """Generate a personalized daily tip using the AI agent."""
-    from models.user import get_user_profile_summary
-
-    profile_summary = get_user_profile_summary(current_user["_id"])
+    full_user = get_full_user(current_user["_id"])
+    profile = full_user.get("profile", {})
+    ai_profile = full_user.get("ai_profile", {})
     username = current_user.get("username", "Player")
+
+    context = f"Username: {username}\n"
+    context += f"Games: {', '.join(profile.get('favorite_games', []))}\n"
+
+    if ai_profile:
+        context += f"Player archetype: {ai_profile.get('player_archetype', 'unknown')}\n"
+        context += f"Growth areas: {ai_profile.get('growth_areas', 'unknown')}\n"
+
+    ranks = profile.get("ranks", {})
+    if ranks:
+        context += f"Ranks: {', '.join(f'{g}: {r}' for g, r in ranks.items())}\n"
 
     try:
         from google import genai
@@ -209,8 +292,8 @@ def dashboard_tip(current_user):
             model="gemini-2.0-flash",
             contents=[
                 f"Based on this gamer's profile, give ONE short, specific, actionable gaming tip "
-                f"(2-3 sentences max). Make it personalized to their games and skill level.\n\n"
-                f"Profile:\n{profile_summary}"
+                f"(2-3 sentences max). Be specific to their games and rank. Not generic.\n\n"
+                f"Profile:\n{context}"
             ],
             config={"temperature": 0.8, "max_output_tokens": 150},
         )
@@ -220,6 +303,183 @@ def dashboard_tip(current_user):
         return jsonify({"tip": f"Keep grinding, {username}! Consistency beats talent.", "username": username})
 
 
+# ── Recommendations ──────────────────────────────────────────────
+
+
+@app.route("/api/recommendations", methods=["GET"])
+@token_required
+def get_recommendations(current_user):
+    """AI-powered game recommendations based on player profile."""
+    full_user = get_full_user(current_user["_id"])
+    profile = full_user.get("profile", {})
+    ai_profile = full_user.get("ai_profile", {})
+    games = profile.get("favorite_games", [])
+    username = full_user.get("username", "Player")
+
+    if not games:
+        return jsonify({"recommendations": [], "message": "Set up your games first!"})
+
+    context = f"Player: {username}\n"
+    context += f"Currently plays: {', '.join(games)}\n"
+
+    ranks = profile.get("ranks", {})
+    if ranks:
+        context += f"Ranks: {', '.join(f'{g}: {r}' for g, r in ranks.items())}\n"
+
+    playstyle = profile.get("playstyle", [])
+    if playstyle:
+        context += f"Playstyle: {', '.join(playstyle)}\n"
+
+    goals = profile.get("goals", [])
+    if goals:
+        context += f"Goals: {', '.join(goals)}\n"
+
+    if ai_profile and ai_profile.get("player_archetype"):
+        context += f"Player archetype: {ai_profile['player_archetype']}\n"
+    if ai_profile and ai_profile.get("recommendations_angle"):
+        context += f"What resonates: {ai_profile['recommendations_angle']}\n"
+
+    try:
+        from google import genai
+        rec_client = genai.Client(api_key=GEMINI_API_KEY)
+        response = rec_client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
+                f"Based on this player's profile, suggest 6 games they would love.\n\n"
+                f"Profile:\n{context}\n\n"
+                f"For each game, explain WHY it fits THIS specific player (reference their games/rank/style).\n"
+                f'Respond ONLY with valid JSON array: [{{"name": "Game Name", "reason": "personalized reason", "match_score": 85, "because_of": "which of their games this relates to"}}]\n'
+                f"No markdown, just JSON."
+            ],
+            config={"temperature": 0.6, "max_output_tokens": 500},
+        )
+
+        text = response.text.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+
+        import json as _json
+        recs = _json.loads(text.strip())
+        return jsonify({"recommendations": recs})
+    except Exception as e:
+        print(f"[WARN] Recommendations failed: {e}")
+        return jsonify({"recommendations": [], "error": "Could not generate recommendations"})
+
+
+# ── Guides ───────────────────────────────────────────────────────
+
+
+@app.route("/api/guides/generate", methods=["POST"])
+@token_required
+def generate_guide(current_user):
+    """Generate a personalized guide for a specific game/topic."""
+    data = request.get_json()
+    game = data.get("game", "")
+    topic = data.get("topic", "general")
+
+    if not game:
+        return jsonify({"error": "Game name is required"}), 400
+
+    full_user = get_full_user(current_user["_id"])
+    profile = full_user.get("profile", {})
+    rank = profile.get("ranks", {}).get(game, "unknown")
+    role = profile.get("main_roles", {}).get(game)
+    skill = profile.get("skill_levels", {}).get(game, "unknown")
+    username = full_user.get("username", "Player")
+
+    player_context = f"Player: {username}, {skill} level"
+    if rank != "unknown":
+        player_context += f", currently {rank}"
+    if role:
+        player_context += f", mains {role}"
+
+    topic_prompts = {
+        "general": f"Write a comprehensive strategy guide for {game}.",
+        "climbing": f"Write a rank climbing guide for {game}.",
+        "role": f"Write a {role or 'role-specific'} guide for {game}.",
+        "meta": f"Explain the current meta for {game} and how to abuse it.",
+        "beginner": f"Write a beginner-friendly intro guide for {game}.",
+        "advanced": f"Write advanced tips and tricks for {game} that most players miss.",
+    }
+
+    prompt = topic_prompts.get(topic, topic_prompts["general"])
+
+    try:
+        from google import genai
+        guide_client = genai.Client(api_key=GEMINI_API_KEY)
+        response = guide_client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
+                f"{prompt}\n\n"
+                f"Tailor this specifically for: {player_context}\n\n"
+                f"Format with clear sections. Use markdown headers (##). "
+                f"Include specific champion/agent/character names, numbers, and actionable advice. "
+                f"Keep it under 500 words. Make it feel like advice from a coach who knows them."
+            ],
+            config={"temperature": 0.5, "max_output_tokens": 800},
+        )
+        return jsonify({
+            "guide": response.text.strip(),
+            "game": game,
+            "topic": topic,
+            "tailored_for": player_context,
+        })
+    except Exception as e:
+        print(f"[WARN] Guide generation failed: {e}")
+        return jsonify({"error": "Could not generate guide"})
+
+
+# ── Stats ────────────────────────────────────────────────────────
+
+
+@app.route("/api/stats", methods=["GET"])
+@token_required
+def get_player_stats(current_user):
+    """Aggregate player stats from conversations and profile."""
+    from models.conversation import conversations_collection
+
+    user_id = current_user["_id"]
+    full_user = get_full_user(user_id)
+    profile = full_user.get("profile", {})
+    ai_profile = full_user.get("ai_profile", {})
+
+    total_messages = conversations_collection.count_documents({"user_id": user_id, "role": "user"})
+    total_sessions = len(list(conversations_collection.distinct("session_id", {"user_id": user_id})))
+
+    # Get most discussed topics from recent messages
+    recent_msgs = list(
+        conversations_collection.find(
+            {"user_id": user_id, "role": "user"}
+        ).sort("timestamp", -1).limit(20)
+    )
+
+    return jsonify({
+        "profile": {
+            "games": profile.get("favorite_games", []),
+            "ranks": profile.get("ranks", {}),
+            "roles": profile.get("main_roles", {}),
+            "skills": profile.get("skill_levels", {}),
+            "playstyle": profile.get("playstyle", []),
+            "goals": profile.get("goals", []),
+        },
+        "activity": {
+            "total_messages": total_messages,
+            "total_sessions": total_sessions,
+            "member_since": full_user.get("created_at", "").isoformat() if full_user.get("created_at") else None,
+        },
+        "ai_insights": {
+            "archetype": ai_profile.get("player_archetype"),
+            "personality": ai_profile.get("personality_notes"),
+            "growth_areas": ai_profile.get("growth_areas"),
+            "coaching_style": ai_profile.get("coaching_style"),
+            "recent_mood": ai_profile.get("recent_mood"),
+            "discovered_interests": ai_profile.get("discovered_interests", []),
+        },
+    })
+
+
 # ── Admin ────────────────────────────────────────────────────────
 
 
@@ -227,7 +487,6 @@ def dashboard_tip(current_user):
 @token_required
 def view_cache(current_user):
     from models.cache import list_cached_keys
-
     return jsonify({"cache": list_cached_keys()})
 
 
@@ -240,7 +499,6 @@ def refresh_cache(current_user):
         return jsonify({"error": "Provide a game name"}), 400
 
     from models.cache import invalidate_cache
-
     key = game.lower().replace(" ", "_")
     invalidate_cache(f"game:{key}:meta")
     invalidate_cache(f"game:{key}:general")
@@ -255,6 +513,7 @@ if __name__ == "__main__":
     print("   🎯 recommend_games")
     print("   👤 get_player_profile")
     print("   ⚖️  compare_games")
+    print("🧠 Profile Intelligence active")
     print("🔐 JWT authentication enabled")
     print("💾 MongoDB connected")
     print("🌐 Server running at http://localhost:5000\n")

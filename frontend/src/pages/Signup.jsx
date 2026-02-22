@@ -140,7 +140,8 @@ export default function Signup() {
         },
       });
 
-      // Refresh user context so dashboard + chat have the full profile
+      // Give the backend AI profile builder ~2s to process, then refresh
+      await new Promise(r => setTimeout(r, 2000));
       await refreshUser();
 
       navigate('/chat');
@@ -540,7 +541,7 @@ export default function Signup() {
               <button onClick={() => setStep(4)} className="flex-1 py-3 border border-nox-border text-nox-muted rounded-lg hover:text-white transition-colors">← Back</button>
               <button onClick={handleComplete} disabled={isLoading}
                 className="flex-1 py-3 bg-nox-red hover:bg-nox-red-bright disabled:opacity-30 text-white font-gaming tracking-widest rounded-lg transition-all hover:shadow-[0_0_20px_rgba(255,45,85,0.3)]">
-                {isLoading ? 'CREATING...' : 'ENTER NEXUS →'}
+                {isLoading ? 'BUILDING YOUR PROFILE...' : 'ENTER NEXUS →'}
               </button>
             </div>
           </div>

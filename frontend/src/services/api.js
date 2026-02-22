@@ -37,7 +37,7 @@ export async function updateProfile(profileData) {
   return response.data;
 }
 
-// Chat sessions
+// Chat
 const SESSION_KEY = 'gg_nexus_session_id';
 
 let currentSessionId = sessionStorage.getItem(SESSION_KEY) ||
@@ -56,6 +56,11 @@ export function newSession() {
   currentSessionId = 'session-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 7);
   sessionStorage.setItem(SESSION_KEY, currentSessionId);
   return currentSessionId;
+}
+
+export async function getWelcomeMessage() {
+  const response = await api.get('/chat/welcome');
+  return response.data;
 }
 
 export async function sendMessage(message) {
@@ -86,6 +91,24 @@ export async function getDashboardGameDetail(gameName) {
 
 export async function getDashboardTip() {
   const response = await api.get('/dashboard/tip');
+  return response.data;
+}
+
+// Recommendations
+export async function getRecommendations() {
+  const response = await api.get('/recommendations');
+  return response.data;
+}
+
+// Guides
+export async function generateGuide(game, topic) {
+  const response = await api.post('/guides/generate', { game, topic });
+  return response.data;
+}
+
+// Stats
+export async function getPlayerStats() {
+  const response = await api.get('/stats');
   return response.data;
 }
 
