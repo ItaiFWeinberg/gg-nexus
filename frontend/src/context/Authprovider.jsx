@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import AuthContext from './AuthContext';
+import AuthContext from './Authcontext';
 import { login as apiLogin, signup as apiSignup, getCurrentUser, setToken, clearToken } from '../services/api';
 
 const hasToken = !!sessionStorage.getItem('gg_nexus_token');

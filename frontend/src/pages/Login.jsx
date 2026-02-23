@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/Authcontext';
 import NoxusLogo from '../components/NoxusLogo';
 import BotAvatar from '../components/BotAvatar';
 import ParticleBackground from '../components/ParticleBackground';

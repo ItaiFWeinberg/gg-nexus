@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RiBookOpenLine, RiSwordLine, RiArrowUpLine, RiLightbulbLine, RiMagicLine, RiGamepadLine } from 'react-icons/ri';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/Authcontext';
 import { generateGuide } from '../services/api';
 import BotAvatar from '../components/BotAvatar';
 
@@ -115,7 +115,6 @@ export default function Guides() {
         <div className="flex flex-wrap gap-2">
           {games.map((game) => {
             const rank = profile.ranks?.[game];
-            const role = profile.main_roles?.[game];
             return (
               <button key={game} onClick={() => { setSelectedGame(game); setGuide(null); }}
                 className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${

@@ -349,23 +349,40 @@ def get_recommendations(current_user):
         response = rec_client.models.generate_content(
             model="gemini-2.0-flash",
             contents=[
-                f"Based on this player's profile, suggest 6 games they would love.\n\n"
+                f"Suggest 4 games for this player. Keep reasons SHORT (1 sentence each).\n\n"
                 f"Profile:\n{context}\n\n"
-                f"For each game, explain WHY it fits THIS specific player (reference their games/rank/style).\n"
-                f'Respond ONLY with valid JSON array: [{{"name": "Game Name", "reason": "personalized reason", "match_score": 85, "because_of": "which of their games this relates to"}}]\n'
-                f"No markdown, just JSON."
+                f'Respond ONLY with a valid JSON array, no markdown:\n'
+                f'[{{"name":"Game","reason":"short reason","match_score":85,"because_of":"their game"}}]\n'
+                f"4 items. Reasons under 20 words each. Valid JSON only."
             ],
-            config={"temperature": 0.6, "max_output_tokens": 500},
+            config={"temperature": 0.6, "max_output_tokens": 800},
         )
 
         text = response.text.strip()
+        # Strip markdown fences
         if text.startswith("```"):
             text = text.split("\n", 1)[1] if "\n" in text else text[3:]
         if text.endswith("```"):
             text = text[:-3]
+        text = text.strip()
 
+        # Try to extract JSON array even if truncated
         import json as _json
-        recs = _json.loads(text.strip())
+        try:
+            recs = _json.loads(text)
+        except _json.JSONDecodeError:
+            # Try to find the last complete object and close the array
+            last_brace = text.rfind("}")
+            if last_brace > 0:
+                truncated = text[:last_brace + 1]
+                if not truncated.strip().endswith("]"):
+                    truncated = truncated.rstrip(",\n ") + "]"
+                if not truncated.strip().startswith("["):
+                    truncated = "[" + truncated
+                recs = _json.loads(truncated)
+            else:
+                raise
+
         return jsonify({"recommendations": recs})
     except Exception as e:
         print(f"[WARN] Recommendations failed: {e}")
@@ -482,6 +499,57 @@ def get_player_stats(current_user):
             "discovered_interests": ai_profile.get("discovered_interests", []),
         },
     })
+
+
+# ── Community ─────────────────────────────────────────────────────
+
+
+@app.route("/api/community/lfg", methods=["GET"])
+@token_required
+def get_lfg_posts(current_user):
+    """Get recent LFG (looking for group) posts."""
+    from models.conversation import conversations_collection
+    db = conversations_collection.database
+    lfg = db.lfg_posts
+
+    posts = list(lfg.find().sort("created_at", -1).limit(20))
+    for p in posts:
+        p["_id"] = str(p["_id"])
+        if "created_at" in p:
+            p["created_at"] = p["created_at"].isoformat()
+
+    return jsonify({"posts": posts})
+
+
+@app.route("/api/community/lfg", methods=["POST"])
+@token_required
+def create_lfg_post(current_user):
+    """Create an LFG post."""
+    from datetime import datetime
+    from models.conversation import conversations_collection
+    db = conversations_collection.database
+    lfg = db.lfg_posts
+
+    data = request.get_json()
+    if not data or not data.get("game"):
+        return jsonify({"error": "Game is required"}), 400
+
+    profile = current_user.get("profile", {})
+    post = {
+        "username": current_user.get("username", "Player"),
+        "user_id": current_user["_id"],
+        "game": data["game"],
+        "message": data.get("message", "Looking for teammates!"),
+        "rank": profile.get("ranks", {}).get(data["game"]),
+        "role": profile.get("main_roles", {}).get(data["game"]),
+        "region": profile.get("personal", {}).get("region", ""),
+        "created_at": datetime.utcnow(),
+    }
+
+    lfg.insert_one(post)
+    post["_id"] = str(post["_id"])
+    post["created_at"] = post["created_at"].isoformat()
+    return jsonify({"post": post}), 201
 
 
 # ── Admin ────────────────────────────────────────────────────────

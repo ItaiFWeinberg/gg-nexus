@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { RiTrophyLine, RiSwordLine, RiStarLine, RiBrainLine, RiTimeLine, RiChatSmile2Line, RiGamepadLine, RiUserLine } from 'react-icons/ri';
-import { useAuth } from '../context/AuthContext';
 import { getPlayerStats } from '../services/api';
 import BotAvatar from '../components/BotAvatar';
 
@@ -15,7 +14,7 @@ const ARCHETYPE_ICONS = {
   completionist: '🏅', 'thrill-seeker': '🔥', learner: '📚', veteran: '👑',
 };
 
-function StatCard({ icon: Icon, label, value, color }) {
+function StatCard({ icon: Icon, label, value, color }) { // eslint-disable-line no-unused-vars
   return (
     <div className="bg-nox-card border border-nox-border rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-2">
@@ -41,7 +40,6 @@ function InsightCard({ title, content, icon }) {
 }
 
 export default function Stats() {
-  const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 

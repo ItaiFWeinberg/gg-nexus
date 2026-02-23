@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RiChatSmile2Line, RiRefreshLine, RiArrowRightLine, RiLightbulbLine, RiTrophyLine, RiSwordLine, RiStarLine, RiGamepadLine } from 'react-icons/ri';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/Authcontext';
 import { getDashboardGames, getDashboardTip } from '../services/api';
 import BotAvatar from '../components/BotAvatar';
 
@@ -109,6 +109,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [tipLoading, setTipLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const dataFetched = useRef(false);
 
   const profile = user?.profile || {};
   const favoriteGames = profile.favorite_games || [];
@@ -141,7 +142,9 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    if (dataFetched.current) return;
     if (favoriteGames.length > 0) {
+      dataFetched.current = true;
       fetchData(false);
       fetchTip();
     } else {

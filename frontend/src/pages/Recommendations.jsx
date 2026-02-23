@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { RiRefreshLine, RiStarLine, RiGamepadLine, RiArrowRightLine } from 'react-icons/ri';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/Authcontext';
 import { getRecommendations } from '../services/api';
 import BotAvatar from '../components/BotAvatar';
 

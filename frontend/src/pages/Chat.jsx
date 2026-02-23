@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { RiSendPlaneFill, RiAddLine, RiHistoryLine, RiCloseLine, RiChat3Line } from 'react-icons/ri';
 import { sendMessage, getWelcomeMessage, newSession, getSessionId, setSessionId, getSessionHistory, getChatSessions } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/Authcontext';
 import BotAvatar from '../components/BotAvatar';
 
 const VALID_MOODS = ['happy', 'empathy', 'excited', 'thinking', 'curious', 'proud', 'frustrated', 'idle', 'playful', 'intense', 'supportive', 'impressed'];

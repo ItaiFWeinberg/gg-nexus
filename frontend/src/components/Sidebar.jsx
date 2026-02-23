@@ -1,7 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { RiDashboardLine, RiChatSmile2Line, RiGamepadLine, RiBarChartLine, RiBookOpenLine, RiTeamLine, RiLogoutBoxLine } from 'react-icons/ri';
+import { RiDashboardLine, RiChatSmile2Line, RiGamepadLine, RiBarChartLine, RiBookOpenLine, RiTeamLine, RiLogoutBoxLine, RiPaletteLine } from 'react-icons/ri';
 import NoxusLogo from './NoxusLogo';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/Authcontext';
+import { useTheme } from '../context/useTheme';
 
 const navItems = [
   { path: '/chat', icon: RiChatSmile2Line, label: 'Nexus AI' },
@@ -14,6 +15,7 @@ const navItems = [
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { themeKey, setTheme, themes } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -62,6 +64,30 @@ export default function Sidebar() {
             </div>
           </div>
         </div>
+
+        {/* Theme picker */}
+        <div className="px-3 py-2">
+          <div className="hidden lg:flex items-center gap-1.5 mb-1">
+            <RiPaletteLine className="text-xs text-nox-subtle" />
+            <span className="text-[9px] text-nox-subtle uppercase tracking-widest">Theme</span>
+          </div>
+          <div className="flex gap-1.5 justify-center lg:justify-start">
+            {Object.entries(themes).map(([key, theme]) => (
+              <button key={key} onClick={() => setTheme(key)}
+                title={theme.label}
+                className={`w-5 h-5 rounded-full transition-all ${
+                  themeKey === key ? 'ring-2 ring-offset-1 ring-offset-nox-dark scale-110' : 'opacity-60 hover:opacity-100'
+                }`}
+                style={{
+                  background: theme.accent,
+                  ringColor: theme.accent,
+                  boxShadow: themeKey === key ? `0 0 8px ${theme.accent}60` : 'none',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
         <button onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-nox-muted hover:text-nox-red hover:bg-nox-hover transition-all">
           <RiLogoutBoxLine className="text-lg mx-auto lg:mx-0" />

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './context/Authcontext';
 import AuthProvider from './context/AuthProvider';
+import ThemeProvider from './context/ThemeContext';
 import Sidebar from './components/Sidebar';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
@@ -10,12 +11,15 @@ import Chat from './pages/Chat';
 import Recommendations from './pages/Recommendations';
 import Stats from './pages/Stats';
 import Guides from './pages/Guides';
+import Community from './pages/Community';
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <ThemeProvider>
+          <AppRoutes />
+        </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>
   );
@@ -54,21 +58,9 @@ function ProtectedLayout() {
           <Route path="/recommendations" element={<Recommendations />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/guides" element={<Guides />} />
-          <Route path="/community" element={<ComingSoon title="Community" desc="Share builds and connect with gamers" phase="3" />} />
+          <Route path="/community" element={<Community />} />
         </Routes>
       </main>
-    </div>
-  );
-}
-
-function ComingSoon({ title, desc, phase }) {
-  return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="text-center">
-        <p className="text-nox-red text-sm font-medium uppercase tracking-widest mb-3">Phase {phase}</p>
-        <h1 className="text-3xl font-bold text-white mb-2">{title}</h1>
-        <p className="text-nox-muted">{desc}</p>
-      </div>
     </div>
   );
 }

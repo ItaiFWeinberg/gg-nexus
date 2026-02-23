@@ -112,6 +112,17 @@ export async function getPlayerStats() {
   return response.data;
 }
 
+// Community
+export async function getLfgPosts() {
+  const response = await api.get('/community/lfg');
+  return response.data;
+}
+
+export async function createLfgPost(game, message) {
+  const response = await api.post('/community/lfg', { game, message });
+  return response.data;
+}
+
 export async function healthCheck() {
   const response = await api.get('/health');
   return response.data;
